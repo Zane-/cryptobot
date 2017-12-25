@@ -1,7 +1,8 @@
 import json
 import gdax
 from binance.client import Client
-from binance.exceptions import BinanceApiException, BinanceWithdrawException
+from binance.exceptions import BinanceAPIException, BinanceWithdrawException
+
 
 #####~~~~~~~~~~~~~~~Key, Address, and Client Setup~~~~~~~~~~~~~~~~#####
 with open('api_keys.json') as f:
@@ -26,23 +27,19 @@ def get_ltc_btc_gdax():
     return float(public_gdax.get_product_ticker(product_id='LTC-BTC')['price'])
 
 
+# Returns the last price of ETH-LTC on GDAX.
+def get_eth_ltc_gdax():
+    return get_eth_btc_gdax() * (1 / get_ltc_btc_gdax())
+
+
 # Returns the last price of ETH-LTC on binance.
 def get_eth_ltc_binance():
     return 1/float(binance_client.get_ticker(symbol='LTCETH')['lastPrice'])
 
 
-# Returns the amount of ETH convertable from LTC on GDAX.
-# Fees are not taken into account because we will only be placing
-# limit orders.
-def convert_ltc_eth_gdax(ltc):
-    btc = get_eth_btc_gdax() * eth;
-    # reciprocal of LTC-BTC is BTC-LTC
-    return 1/get_ltc_btc_gdax() * btc
-
-
 # Returns the ratio of ETH-LTC on binance to ETH-LTC on GDAX.
 def get_exchange_ratio_eth_ltc():
-    return get_eth_ltc_binance(1) / get_eth_ltc_gdax(1)
+    return get_eth_ltc_binance() / get_eth_ltc_gdax()
 
 
 # Places a limit sell order for LTC-BTC for the market price + a margin percentage,
@@ -70,7 +67,7 @@ def buy_ltc_eth_binance(eth, margin):
             amount=eth * eth_ltc * (99.95),
             price=price,
             disable_validation=True)
-            
+
 
 # Withdraws the specified amount of ether to the ETH address for binance.
 # WARNING: No confirmation is given, and 2FA is bypassed, so double check
@@ -79,7 +76,7 @@ def withdraw_eth_gdax(eth):
     params = {
         'amount': eth,
         'currency': 'ETH',
-        'crypto_address': addresses['eth-binance'] 
+        'crypto_address': addresses['eth-binance']
     }
     gdax_client.withdraw(params)
 
@@ -93,7 +90,7 @@ def withdraw_ltc_binance(ltc):
                 asset='LTC',
                 address=addresses['ltc-gdax'],
                 amount=ltc)
-    except (BinanceApiException, BinanceWithdrawException) as e:
+    except (BinanceAPIException, BinanceWithdrawException) as e:
         with open('exceptions.log', 'w') as f:
             f.write(e)
 

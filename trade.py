@@ -7,7 +7,7 @@ logging.basicConfig(level=logging.DEBUG, filename='bot.log')
 
 WATCHING = ['ICXETH', 'TRXETH', 'XLMETH', 'ADAETH', 'IOTAETH', 'XRPETH', 'NAVETH', 'XVGETH']
 SELL_VOLUME = 0.3 # percent of volume to sell
-
+RUN_INTERVAL = 120 # in minutes
 
 # Returns a dictionary w/ the prices and percent changes of all cryptos in the WATCHING list
 def get_watching_data():
@@ -41,19 +41,17 @@ def sell_highest():
     highest = get_greatest_change()
     b.order_market_sell(
         symbol=highest[0],
-        quantity=SELL_VOLUME * b.get_asset_balance(asset=greatest[0][0:-3]) # truncate ETH
-    )
+        quantity=SELL_VOLUME * b.get_asset_balance(asset=greatest[0][0:-3]) # truncate ETH)
 
 
 # Places a market buy order for the crypto with the highest 24hr decrease.
 def buy_lowest():
-    highest = get_greatest_change(comp=low)
+    lowest = get_greatest_change(comp=low)
     b.order_market_buy(
-       symbol=highest[0],
+       symbol=lowest[0],
        # buy with 97% ETH balance because we sell highest into ETH first
        # and we don't want rounding errors to not let the order go through
-       quantity=b.get_asset_balance(asset='ETH') * 0.97 / highest['price']
-   )
+       quantity=b.get_asset_balance(asset='ETH') * 0.97 / lowest['price'])
 
 def run():
     try:
@@ -70,5 +68,5 @@ def run():
 
 def main():
     scheduler = BlockingScheduler()
-    scheduler.add_job(run, 'interal', minutes=1440)
+    scheduler.add_job(run, 'interal', minutes=RUN_INTERVAL)
     scheduler.start()

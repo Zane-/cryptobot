@@ -1,5 +1,5 @@
 import logging
-from apscheduler.schedules.blocking import BlockingScheduler
+from apscheduler.schedulers.blocking import BlockingScheduler
 from binance.exceptions import BinanceAPIException, BinanceOrderException
 from auth import *
 
@@ -40,8 +40,8 @@ def get_greatest_change(comp=high):
 def sell_highest():
     highest = get_greatest_change()
     b.order_market_sell(
-        symbol=highest['ticker']
-        quantity=SELL_VOLUME * b.get_asset_balance(asset=greatest['ticker'][0:-3]) # truncate ETH)
+        symbol=highest['ticker'],
+        quantity=SELL_VOLUME * b.get_asset_balance(asset=greatest['ticker'][0:-3])) # truncate ETH
 
 
 # Places a market buy order for the crypto with the highest 24hr decrease.

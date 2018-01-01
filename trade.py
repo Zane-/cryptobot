@@ -1,4 +1,5 @@
 import logging
+from apscheduler.schedules.blocking import BlockingScheduler
 from binance.exceptions import BinanceAPIException, BinanceOrderException
 from auth import *
 
@@ -54,8 +55,7 @@ def buy_lowest():
        quantity=b.get_asset_balance(asset='ETH') * 0.97 / highest['price']
    )
 
-
-def main():
+def run():
     try:
         sell_highest()
     except (BinanceAPIException, BinanceOrderException):
@@ -66,3 +66,9 @@ def main():
         buy_lowest()
     except (BinanceAPIException, BinanceOrderException):
         logging.exception("Buy Order Failed:")
+
+
+def main():
+    scheduler = BlockingScheduler()
+    scheduler.add_job(run, 'interal', minutes=1440)
+    scheduler.start()

@@ -26,13 +26,13 @@ low = lambda x, y: x < y
 # the change, and the last price.
 def get_greatest_change(comp=high):
     data = get_watching_data()
-    greatest = [0, 0, 0] # [ticker, 24hr change, price]
+    greatest = {}
     for ticker in data:
         change = data[ticker]['change']
         if comp(change, greatest[1]):
-            greatest[0] = ticker
-            greatest[1] = change
-            greatest[2] = data[ticker]['price']
+            greatest['ticker'] = ticker
+            greatest['change'] = change
+            greatest['price'] = data[ticker]['price']
     return greatest
 
 
@@ -40,15 +40,15 @@ def get_greatest_change(comp=high):
 def sell_highest():
     highest = get_greatest_change()
     b.order_market_sell(
-        symbol=highest[0],
-        quantity=SELL_VOLUME * b.get_asset_balance(asset=greatest[0][0:-3]) # truncate ETH)
+        symbol=highest['ticker']
+        quantity=SELL_VOLUME * b.get_asset_balance(asset=greatest['ticker'][0:-3]) # truncate ETH)
 
 
 # Places a market buy order for the crypto with the highest 24hr decrease.
 def buy_lowest():
     lowest = get_greatest_change(comp=low)
     b.order_market_buy(
-       symbol=lowest[0],
+       symbol=lowest['ticker'],
        # buy with 97% ETH balance because we sell highest into ETH first
        # and we don't want rounding errors to not let the order go through
        quantity=b.get_asset_balance(asset='ETH') * 0.97 / lowest['price'])

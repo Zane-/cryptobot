@@ -1,4 +1,5 @@
 import logging
+from math import floor
 from apscheduler.schedulers.blocking import BlockingScheduler
 from binance.exceptions import BinanceAPIException, BinanceOrderException
 from auth import *
@@ -28,15 +29,13 @@ def get_watching_data():
 
 # Returns a tuple containing (lowest, highest) 24hr percent changes among the cryptos in WATCHING.
 def get_lowest_highest(data):
-    low, high = 0
+    low, high = 0, 0
     for ticker in data:
         change = data[ticker]['change']
         if change > high:
-            high = change
-            highest = ticker
+            high, highest = change, ticker
         elif change < low:
-            low = change
-            lowest = ticker
+            low, lowest = change, ticker
     return (lowest, highest)
 
 
@@ -45,40 +44,46 @@ def get_lowest_highest(data):
 def sell(ticker):
     b.order_market_sell(
         symbol=ticker,
-        quantity=SELL_VOLUME * get_ticker_balance(ticker[0:-3])) # truncate ETH
+        quantity=floor(SELL_VOLUME * get_ticker_balance(ticker[0:-3]))) # truncate ETH
 
 
 # Places a market buy order for the ticker using the specified amount of USD in ether.
 def buy(ticker, price, eth):
-    vol_ticker = eth / price
+    vol_ticker = floor(eth / price)
     b.order_market_buy(
         symbol=ticker,
-        quantity=vol_ticker * 0.97) # 97% for fees and price fluctuations
+        quantity=floor(vol_ticker * 0.97)) # 97% for fees and price fluctuations
 
 
 # Places a market buy order for each of the cryptos in WATCHING for the specified amount of USD.
 # Used to initially load bot.
 def buy_watching(data):
-    eth_per = get_ticker_balance('ETH') * 0.97 / len(watching)
+    eth_per = get_ticker_balance('ETH') * 0.97 / len(WATCHING)
     for ticker in data:
         try:
-            buy(ticker, ticker['price'], eth_per)
+            buy(ticker, data[ticker]['price'], eth_per)
         except (BinanceAPIException, BinanceOrderException) as e:
             print(e)
             logging.exception("Buy order failed:")
 
+def get_vol_watching():
+    data = get_watching_data()
+    eth_per = get_ticker_balance('ETH') * 0.97 / len(WATCHING)
+    return {ticker: eth_per / data[ticker]['price'] for ticker in data}
 
 def run():
     data = get_watching_data()
-    lowest, highest = get_lowest_highest()
+    lowest, highest = get_lowest_highest(data)
     try:
         sell(highest)
+        # print(f'Sold {highest} for {data[highest]["price"]} at a change of {data[highest]["change"]}')
     except (BinanceAPIException, BinanceOrderException) as e:
         print(e)
         logging.exception("Sell order failed:")
-        return
+        return # do not proceed with buy because ETH balance did not get filled
     try:
-        buy(lowest, data[lowest]['price'], get_asset_balance('ETH'))
+        buy(lowest, data[lowest]['price'], get_ticker_balance('ETH'))
+        # print(f'Sold {lowest} for {data[lowest]["price"]} at a change of {data[lowest]["change"]'})
     except (BinanceAPIException, BinanceOrderException) as e:
         print(e)
         logging.exception("Buy order failed:")
@@ -88,3 +93,7 @@ def main():
     scheduler = BlockingScheduler()
     scheduler.add_job(run, 'interval', minutes=RUN_INTERVAL)
     scheduler.start()
+
+
+#TODO :
+# Add logging of all transactions in an easy-to-get-data-from format

@@ -9,6 +9,7 @@ WATCHING = ['ICXETH', 'TRXETH', 'XLMETH', 'ADAETH', 'IOTAETH', 'XRPETH', 'NAVETH
 SELL_VOLUME = 0.3 # percent of volume to sell
 RUN_INTERVAL = 120 # in minutes
 
+
 # Returns a dictionary w/ the prices and percent changes of all cryptos in the WATCHING list
 def get_watching_data():
     prices = {}
@@ -52,6 +53,23 @@ def buy_lowest():
        # buy with 97% ETH balance because we sell highest into ETH first
        # and we don't want rounding errors to not let the order go through
        quantity=b.get_asset_balance(asset='ETH') * 0.97 / lowest['price'])
+
+
+# Places a market buy order for the ticker using the specified amount of USD in ether.
+def buy(ticker, usd):
+    eth_usd = b.get_ticker(symbol='ETHUSDT')['lastPrice']
+    vol_eth = eth_usd * usd
+    vol_ticker = vol_eth / b.get_ticker(symbol=ticker)['lastPrice']
+    b.order_market_buy(
+        symbol=ticker,
+        quantity=vol_ticker * 0.97) # 97% for fees and price fluctuations
+
+
+# Places a market buy order for each of the cryptos in WATCHING for the specified amount of USD.
+def buy_watching(usd):
+    for ticker in WATCHING:
+        buy(ticker, usd)
+
 
 def run():
     try:

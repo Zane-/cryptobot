@@ -75,14 +75,14 @@ def run():
     lowest, highest = get_lowest_highest(data)
     try:
         sell(highest)
-        print('Sold {} for {} at a change of {}'.format(highest, data[highest]['price'], data[highest]['change']]))
+        print('Sold {} for {} at a change of {}'.format(highest, data[highest]['price'], data[highest]['change']))
     except (BinanceAPIException, BinanceOrderException) as e:
         print(e)
         logging.exception("Sell order failed:")
         return # do not proceed with buy because ETH balance did not get filled
     try:
         buy(lowest, data[lowest]['price'], get_ticker_balance('ETH'))
-        print('Bought {} for {} at a change of {}'.format(lowest, data[lowest]['price'], data[lowest]['change']]))
+        print('Bought {} for {} at a change of {}'.format(lowest, data[lowest]['price'], data[lowest]['change']))
     except (BinanceAPIException, BinanceOrderException) as e:
         print(e)
         logging.exception("Buy order failed:")

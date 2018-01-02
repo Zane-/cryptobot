@@ -1,3 +1,4 @@
+
 asn1crypto==0.24.0
 attrs==17.4.0
 autobahn==17.10.1
@@ -5,16 +6,11 @@ Automat==0.6.0
 certifi==2017.11.5
 cffi==1.11.2
 chardet==3.0.4
-click==6.7
 constantly==15.1.0
 cryptography==2.1.4
-Flask==0.12.2
 hyperlink==17.3.1
 idna==2.6
 incremental==17.5.0
-itsdangerous==0.24
-Jinja2==2.10
-MarkupSafe==1.0
 pyasn1==0.4.2
 pyasn1-modules==0.2.1
 pycparser==2.18
@@ -26,5 +22,4 @@ six==1.11.0
 Twisted==17.9.0
 txaio==2.8.2
 urllib3==1.22
-Werkzeug==0.14.1
 zope.interface==4.4.3

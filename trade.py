@@ -39,10 +39,10 @@ def get_lowest_highest(data):
 
 # Places a market sell order the crypto. Uses the SELL_VOLUME constant
 # to determine the volume to sell.
-def sell(ticker):
+def sell(ticker, percent):
     b.order_market_sell(
         symbol=ticker,
-        quantity=floor(SELL_VOLUME * get_ticker_balance(ticker[0:-3]))) # truncate ETH
+        quantity=floor(percent * get_ticker_balance(ticker[0:-3]))) # truncate ETH
 
 
 # Places a market buy order for the ticker using the specified amount of USD in ether.
@@ -64,6 +64,18 @@ def buy_watching(data):
             print(e)
             logging.exception("Buy order failed:")
 
+#Places a market sell order for the full amount of each of the cryptos in WATCHING
+#Used to redistrubute total funds into all cryptos when distribution becomes too skewed
+def redistribute_funds(data):
+    for ticker in data:
+        try:
+            sell(ticker, 1.0)
+        except (BinanceAPIException, BinanceOrderException) as e:
+            print(e)
+            logging.exception("Redistribution failed:")
+    #error catching done in buy_watching()
+    buy_watching(data)
+
 
 def run():
     data = get_watching_data()
@@ -72,9 +84,9 @@ def run():
     highest_data = data.pop(highest, None)
     second_lowest, second_highest = get_lowest_highest(data)
     try:
-        sell(highest)
+        sell(highest, SELL_VOLUME)
         print('Sold {} for {} at a change of {}'.format(highest, highest_data['price'], highest_data['change']))
-        sell(second_highest)
+        sell(second_highest, SELL_VOLUME)
         print('Sold {} for {} at a change of {}'.format(second_highest, data[second_highest]['price'], data[second_highest]['change']))
     except (BinanceAPIException, BinanceOrderException) as e:
         print(e)

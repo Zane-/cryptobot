@@ -7,7 +7,6 @@ logging.basicConfig(level=logging.DEBUG, filename='bot.log')
 
 WATCHING = ['ICXETH', 'TRXETH', 'XLMETH', 'ADAETH', 'IOTAETH', 'XRPETH', 'NAVETH', 'XVGETH']
 SELL_VOLUME = 0.3 # percent of volume to sell
-RUN_INTERVAL = 120 # in minutes
 
 
 # Returns the total free balance of the ticker in the account.
@@ -65,24 +64,28 @@ def buy_watching(data):
             print(e)
             logging.exception("Buy order failed:")
 
-def get_vol_watching():
-    data = get_watching_data()
-    eth_per = get_ticker_balance('ETH') * 0.97 / len(WATCHING)
-    return {ticker: eth_per / data[ticker]['price'] for ticker in data}
 
 def run():
     data = get_watching_data()
     lowest, highest = get_lowest_highest(data)
+    lowest_data = data.pop(lowest, None)
+    highest_data = data.pop(highest, None)
+    second_lowest, second_highest = get_lowest_highest(data)
     try:
         sell(highest)
-        print('Sold {} for {} at a change of {}'.format(highest, data[highest]['price'], data[highest]['change']))
+        print('Sold {} for {} at a change of {}'.format(highest, highest_data['price'], highest_data['change']))
+        sell(second_highest)
+        print('Sold {} for {} at a change of {}'.format(second_highest, data[second_highest]['price'], data[second_highest]['change']))
     except (BinanceAPIException, BinanceOrderException) as e:
         print(e)
         logging.exception("Sell order failed:")
         return # do not proceed with buy because ETH balance did not get filled
     try:
-        buy(lowest, data[lowest]['price'], get_ticker_balance('ETH'))
-        print('Bought {} for {} at a change of {}'.format(lowest, data[lowest]['price'], data[lowest]['change']))
+        eth_per = get_ticker_balance('ETH') / 2 * 0.98
+        buy(lowest, lowest_data['price'], eth_per)
+        print('Bought {} for {} at a change of {}'.format(lowest, lowest_data['price'], lowest_data['change']))
+        buy(lowest, data[second_lowest]['price'], eth_per)
+        print('Bought {} for {} at a change of {}'.format(lowest, data[second_lowest]['price'], data[second_lowest]['change']))
     except (BinanceAPIException, BinanceOrderException) as e:
         print(e)
         logging.exception("Buy order failed:")
@@ -91,5 +94,6 @@ def run():
 if __name__ == '__main__':
     run()
 
-#TODO :
-# Add logging of all transactions in an easy-to-get-data-from format
+# TODO :
+# Add logging of all transactions in an easy-to-get-data-from format (csv)
+# Add checks to not trade if the

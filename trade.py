@@ -71,7 +71,9 @@ def get_vol_watching():
     return {ticker: eth_per / data[ticker]['price'] for ticker in data}
 
 def run():
+    print('hello, world!')
     data = get_watching_data()
+    print(data)
     lowest, highest = get_lowest_highest(data)
     try:
         sell(highest)

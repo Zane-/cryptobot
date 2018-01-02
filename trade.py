@@ -72,7 +72,8 @@ def buy(ticker, usd):
 # Places a market buy order for each of the cryptos in WATCHING for the specified amount of USD.
 def buy_watching(usd):
     for ticker in WATCHING:
-        buy(ticker, usd)
+        buy(ticker, usd/len(WATCHING))
+
 
 
 def run():

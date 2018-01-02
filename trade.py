@@ -57,34 +57,46 @@ def buy_lowest():
 
 # Places a market buy order for the ticker using the specified amount of USD in ether.
 def buy(ticker, usd):
-    eth_usd = b.get_ticker(symbol='ETHUSDT')['lastPrice']
+    eth_usd = b.get_ticker(symbol='ETHUSDT')['lastPrice'] # 760
+    eth_bal = b.get_asset_balance(asset='ETH')
+    if (eth_bal * eth_usd) < (usd * 0.97):
+        raise BinanceOrderException
     vol_eth = eth_usd * usd
     vol_ticker = vol_eth / b.get_ticker(symbol=ticker)['lastPrice']
-    b.order_market_buy(
-        symbol=ticker,
-        quantity=vol_ticker * 0.97) # 97% for fees and price fluctuations
+    try:
+        b.order_market_buy(
+            symbol=ticker,
+            quantity=vol_ticker * 0.97) # 97% for fees and price fluctuations
+    except (BinanceAPIException, BinanceOrderException) as e:
+        print(e)
+        logging.exception("Buy order failed:")
 
 
 # Places a market buy order for each of the cryptos in WATCHING for the specified amount of USD.
 def buy_watching(usd):
     for ticker in WATCHING:
-        buy(ticker, usd)
+        try:
+            buy(ticker, usd)
+        except BinanceOrderException as e:
+            print(e)
+            logging.exception("Buy order failed:")
 
 
 def run():
     try:
         sell_highest()
-    except (BinanceAPIException, BinanceOrderException):
-        logging.exception("Sell Order Failed:")
-        exit()
-
+    except (BinanceAPIException, BinanceOrderException) as e:
+        print(e)
+        logging.exception("Sell order failed:")
+        return
     try:
         buy_lowest()
-    except (BinanceAPIException, BinanceOrderException):
-        logging.exception("Buy Order Failed:")
+    except (BinanceAPIException, BinanceOrderException) as e:
+        print(e)
+        logging.exception("Buy order failed:")
 
 
 def main():
     scheduler = BlockingScheduler()
-    scheduler.add_job(run, 'interal', minutes=RUN_INTERVAL)
+    scheduler.add_job(run, 'interval', minutes=RUN_INTERVAL)
     scheduler.start()

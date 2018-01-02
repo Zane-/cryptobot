@@ -48,16 +48,6 @@ def sell(ticker):
         quantity=SELL_VOLUME * get_ticker_balance(ticker[0:-3]))
 
 
-# Places a market buy order for the crypto with the highest 24hr decrease.
-def buy_lowest():
-    lowest = get_greatest_change(comp=low)
-    b.order_market_buy(
-       symbol=lowest['ticker'],
-       # buy with 97% ETH balance because we sell highest into ETH first
-       # and we don't want rounding errors to not let the order go through
-       quantity=get_ticker_balance('ETH') * 0.97 / lowest['price'])
-
-
 # Places a market buy order for the ticker using the specified amount of USD in ether.
 def buy(ticker, price, eth):
     vol_ticker = eth / price

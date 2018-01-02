@@ -11,8 +11,8 @@
 Place file in same directory as trade.py.
 
 ### Installing Requirements:
-`pip install python-binance`
-`pip install apscheduler`
+`pip install -r requirements.txt`
+
 
 ### Getting API Keys:
 Generate key for binance: https://www.binance.com/userCenter/createApi.html

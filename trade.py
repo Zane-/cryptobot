@@ -45,39 +45,40 @@ def get_lowest_highest(data):
 def sell(ticker):
     b.order_market_sell(
         symbol=ticker,
-        quantity=SELL_VOLUME * get_ticker_balance(ticker[0:-3]))
+        quantity=SELL_VOLUME * get_ticker_balance(ticker[0:-3])) # truncate ETH
 
 
 # Places a market buy order for the ticker using the specified amount of USD in ether.
 def buy(ticker, price, eth):
     vol_ticker = eth / price
-    try:
-        b.order_market_buy(
-            symbol=ticker,
-            quantity=vol_ticker * 0.97) # 97% for fees and price fluctuations
-    except (BinanceAPIException, BinanceOrderException) as e:
-        print(e)
-        logging.exception("Buy order failed:")
+    b.order_market_buy(
+        symbol=ticker,
+        quantity=vol_ticker * 0.97) # 97% for fees and price fluctuations
 
 
 # Places a market buy order for each of the cryptos in WATCHING for the specified amount of USD.
+# Used to initially load bot.
 def buy_watching(data):
     eth_per = get_ticker_balance('ETH') * 0.97 / len(watching)
     for ticker in data:
-        buy(ticker, ticker['price'], eth_per)
+        try:
+            buy(ticker, ticker['price'], eth_per)
+        except (BinanceAPIException, BinanceOrderException) as e:
+            print(e)
+            logging.exception("Buy order failed:")
 
 
 def run():
     data = get_watching_data()
     lowest, highest = get_lowest_highest()
     try:
-        sell(lowest)
+        sell(highest)
     except (BinanceAPIException, BinanceOrderException) as e:
         print(e)
         logging.exception("Sell order failed:")
         return
     try:
-        buy(highest, data[highest]['price'], get_asset_balance('ETH'))
+        buy(lowest, data[lowest]['price'], get_asset_balance('ETH'))
     except (BinanceAPIException, BinanceOrderException) as e:
         print(e)
         logging.exception("Buy order failed:")

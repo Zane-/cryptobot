@@ -57,10 +57,7 @@ def buy_lowest():
 
 # Places a market buy order for the ticker using the specified amount of USD in ether.
 def buy(ticker, usd):
-    eth_usd = b.get_ticker(symbol='ETHUSDT')['lastPrice'] # 760
-    eth_bal = b.get_asset_balance(asset='ETH')
-    if (eth_bal * eth_usd) < (usd * 0.97):
-        raise BinanceOrderException
+    eth_usd = b.get_ticker(symbol='ETHUSDT')['lastPrice']
     vol_eth = eth_usd * usd
     vol_ticker = vol_eth / b.get_ticker(symbol=ticker)['lastPrice']
     try:
@@ -75,11 +72,7 @@ def buy(ticker, usd):
 # Places a market buy order for each of the cryptos in WATCHING for the specified amount of USD.
 def buy_watching(usd):
     for ticker in WATCHING:
-        try:
-            buy(ticker, usd)
-        except BinanceOrderException as e:
-            print(e)
-            logging.exception("Buy order failed:")
+        buy(ticker, usd)
 
 
 def run():

@@ -93,6 +93,8 @@ def run():
 def main():
     run()
 
+if __name__ == '__main__':
+    main()
 
 #TODO :
 # Add logging of all transactions in an easy-to-get-data-from format

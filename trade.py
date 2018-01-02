@@ -71,30 +71,25 @@ def get_vol_watching():
     return {ticker: eth_per / data[ticker]['price'] for ticker in data}
 
 def run():
-    print('hello, world!')
     data = get_watching_data()
-    print(data)
     lowest, highest = get_lowest_highest(data)
     try:
         sell(highest)
-        print('Sold {} for {} at a change of {}'.format(highest, data[highest]['price'], data[highest['change']]))
+        print('Sold {} for {} at a change of {}'.format(highest, data[highest]['price'], data[highest]['change']]))
     except (BinanceAPIException, BinanceOrderException) as e:
         print(e)
         logging.exception("Sell order failed:")
         return # do not proceed with buy because ETH balance did not get filled
     try:
         buy(lowest, data[lowest]['price'], get_ticker_balance('ETH'))
-        print('Sold {} for {} at a change of {}'.format(lowest, data[lowest]['price'], data[lowest['change']]))
+        print('Bought {} for {} at a change of {}'.format(lowest, data[lowest]['price'], data[lowest]['change']]))
     except (BinanceAPIException, BinanceOrderException) as e:
         print(e)
         logging.exception("Buy order failed:")
 
 
-def main():
-    run()
-
 if __name__ == '__main__':
-    main()
+    run()
 
 #TODO :
 # Add logging of all transactions in an easy-to-get-data-from format

@@ -1,7 +1,7 @@
 from exchange_utils import *
 
 
-class low_high_pair_strat:
+class LowHighPairStrat:
     ###   DEFAULTS    ###
     WATCHING = ['ICX/ETH', 'TRX/ETH', 'XLM/ETH', 'ADA/ETH', 'IOTA/ETH', 'XRP/ETH', 'NAV/ETH', 'XVG/ETH']
     SELL_PERCENT = 30 # percent of volume to sell in the run function
@@ -23,7 +23,7 @@ class low_high_pair_strat:
                 low, lowest = change, ticker
         return (lowest, highest)
 
-    def __call__(self, num=None):
+    def start(self, num=None):
         num = self.num if not num else num
         data = fetch_tickers(watching)
         eth_per = fetch_balance('ETH') / num * 0.98

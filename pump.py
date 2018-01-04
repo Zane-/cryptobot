@@ -15,7 +15,7 @@ def main(ticker, sell_percent, change_step, time_interval):
     sell_change = sell_percent + ticker_data['change']
     sell_price = price * (1 + sell_change/100)
 
-    order = limit_sell(ticker, sell_price)
+    order = limit_sell(ticker, 100, sell_price)
     print(order)
 
     ###               GRADIENT PERCENTAGE DECREASE               ###
@@ -33,7 +33,7 @@ def main(ticker, sell_percent, change_step, time_interval):
                 continue
             sell_canceled = True
 
-        order = limit_sell(ticker, sell_price)
+        order = limit_sell(ticker, 100, sell_price)
         print(order)
     ###                                                          ###
 

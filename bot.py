@@ -1,9 +1,9 @@
-from strategies import low_high_pair_strat
+from strategies import LowHighPairStrat
 
 
 def main():
-    bot = low_high_pair_strat(2)
-    bot()
+    bot = LowHighPairStrat(2)
+    bot.start()
 
 
 if __name__ == '__main__':

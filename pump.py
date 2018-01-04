@@ -18,7 +18,7 @@ def limit_sell(ticker, price):
 
 def liquidate_watching():
     for ticker in trade.WATCHING:
-            trade.sell(ticker, 100)
+            order = trade.sell(ticker, 100)
             print(order)
 
 

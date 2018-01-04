@@ -1,36 +1,17 @@
 from math import floor
 from time import sleep
-import trade
 
-def limit_sell(ticker, price):
-    sell_placed = False
-    while not sell_placed:
-        try:
-            order = trade.binance.create_limit_sell_order(
-                ticker,
-                floor(trade.fetch_balance(ticker[0:-4]) * 0.985),
-                price)
-        except trade.ccxt.BaseError as e:
-            print(e)
-            continue
-        sell_placed = True
-    return order
+from exchange_utils import *
 
+WATCHING = ['ICX', 'TRX', 'XLM', 'ADA', 'IOTA', 'XRP', 'NAV', 'XVG']
 
-def liquidate_watching():
-    for ticker in trade.WATCHING:
-            order = trade.sell(ticker, 100)
-            print(order)
+def main(ticker, sell_percent, change_step, time_interval):
+    eth = fetch_balance('ETH')
 
-
-def main():
-    eth = trade.fetch_balance('ETH')
-    ticker = input('TICKER: ')
-    ticker_data = trade.fetch_ticker(ticker)
+    ticker_data = fetch_ticker(ticker)
     price = ticker_data['bid']
-    trade.buy(ticker, price, eth)
+    buy(ticker, price, eth)
 
-    sell_percent = float(input('PERCENTAGE INCREASE TO SELL: '))
     sell_change = sell_percent + ticker_data['change']
     sell_price = price * (1 + sell_change/100)
 
@@ -38,30 +19,33 @@ def main():
     print(order)
 
     ###               GRADIENT PERCENTAGE DECREASE               ###
-    change_step = float(input('DECREASE STEP: '))
-    timeout = float(input('TIMEOUT (SEC): '))
-    sell_change -= change_step
-
     # while it hasn't sold
-    while trade.fetch_balance(ticker[0:-4]) >= 1:
-        time.sleep(timeout)
+    while fetch_balance(ticker[0:-4]) >= 1:
+        time.sleep(time_interval)
+        sell_change -= step_change
         sell_price = price * (1 + sell_change/100)
         sell_canceled = False
         while not sell_canceled:
             try:
-                trade.binance.cancel_order(order['orderId'], ticker)
-            except trade.ccxt.BaseError as e:
+                exchange.cancel_order(order['orderId'], ticker)
+            except ccxt.BaseError as e:
                 print(e)
                 continue
             sell_canceled = True
 
         order = limit_sell(ticker, sell_price)
         print(order)
-        sell_change -= change_step
     ###                                                          ###
 
 
 if __name__ == '__main__':
-    input("<[PUMP BOT 1.0 | PRESS ENTER TO START]>")
-    #liquidate_watching()
-    main() # start bot
+    sell_percent = float(input("<[PUMP BOT 1.0 | ENTER PERCENTAGE INCREASE TO SELL]>\n"))
+    step_change = float(input("<[PUMP BOT 1.0 | ENTER PERCENTAGE STEP CHANGE]>\n"))
+    time_interval  = float(input("<[PUMP BOT 1.0 | ENTER TIME INTERVAL (SEC) TO EXECUTE STEPS]>\n"))
+    input("<[PUMP BOT 1.0 | PRESS ENTER TO SELL COINS INTO ETHEREUM]>\n")
+    cancel_all_orders(fetch_nonzero_balances(WATCHING))
+    liquidate_watching()
+    ticker = input("<[PUMP BOT 1.0 | ENTER THE TICKER AND PRESS ENTER TO START]>\n")
+
+
+    main(ticker, sell_percent, change_step, time_interval) # start bot

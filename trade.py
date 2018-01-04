@@ -12,19 +12,25 @@ SELL_VOLUME = 30 # percent of volume to sell in the run function
 
 # Returns the total free balance of the ticker in the account.
 def fetch_balance(ticker):
-    try:
-        balance = float(binance.fetch_balance()[ticker]['free'])
-    except ccxt.NetworkError:
-        fetch_balance(ticker)
+    balanced_fetched = False
+    while not balance_fetched:
+        try:
+            balance = float(binance.fetch_balance()[ticker]['free'])
+        except ccxt.NetworkError:
+            continue
+        balance_fetched = True
     return balance
 
 
 # Returns the price and 24hr change for the ticker.
 def fetch_ticker(ticker):
-    try:
-        data = binance.fetch_ticker(ticker)
-    except ccxt.NetworkError:
-        fetch_ticker(ticker)
+    ticker_fetched = False
+    while not ticker_fetched:
+        try:
+            data = binance.fetch_ticker(ticker)
+        except ccxt.NetworkError:
+            continue
+        ticker_fetched = True
     return {'bid': float(data['bid']), 'change': float(data['change'])}
 
 
@@ -49,26 +55,37 @@ def fetch_lowest_highest(data):
 # Places a market sell order for the ticker using the
 # given percentage of the available balance.
 def sell(ticker, percent):
-    try:
-        binance.create_market_sell_order(ticker, floor(fetch_balance(ticker[0:-4]) * (percent/100)))
-    except ccxt.ExchangeError:
-        print(e)
-    except ccxt.NetworkError:
-        sell(ticker, percent)
+    sold = False
+    while not sold:
+        try:
+            order = binance.create_market_sell_order(ticker, floor(fetch_balance(ticker[0:-4]) * (percent/100)))
+        except ccxt.ExchangeError:
+            print(e)
+            return None
+        except ccxt.NetworkError:
+            continue
+        sold = True
+    return order
 
 
 # Places a market buy order for the ticker using the specified amount of USD in ether.
 # The price of the crypto is given to determine the volume to buy.
 def buy(ticker, price, eth):
     vol_ticker = floor(eth / price)
-    try:
-        binance.create_market_buy_order(ticker, vol_ticker * 0.98) # 98% for fees and fluctuations
-    except ccxt.InsufficientFunds as e:
-        buy(ticker, price*1.01, eth)
-    except ccxt.NetworkError as e:
-        buy(ticker, price, eth)
-    except ccxt.BaseError as e:
-        print(e)
+    bought = False
+    while not bought:
+        try:
+            order = binance.create_market_buy_order(ticker, vol_ticker * 0.98) # 98% for fees and fluctuations
+        except ccxt.InsufficientFunds as e:
+            price = price * 1.01
+            continue
+        except ccxt.NetworkError as e:
+            continue
+        except ccxt.BaseError as e:
+            print(e)
+            return None
+        bought = True
+    return order
 
 
 # Places a market buy order for each of the cryptos in WATCHING

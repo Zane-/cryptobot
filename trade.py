@@ -13,7 +13,7 @@ SELL_VOLUME = 30 # percent of volume to sell in the run function
 # Returns the total free balance of the ticker in the account.
 def fetch_balance(ticker):
     try:
-        balance = float(binance.fetch_balance()[ticker])
+        balance = float(binance.fetch_balance()[ticker]['free'])
     except ccxt.NetworkError:
         fetch_balance(ticker)
     return balance

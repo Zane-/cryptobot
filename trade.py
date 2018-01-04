@@ -92,7 +92,7 @@ def get_portfolio(data):
     eth_usd = fetch_ticker('ETH/USDT')['bid']
     total = eth_usd * fetch_balance('ETH')
     for ticker in data:
-        total += eth_usd * fetch_balance(ticker[0:-3]) * data[ticker]['bid']
+        total += eth_usd * fetch_balance(ticker[0:-4]) * data[ticker]['bid']
     return total
 
 

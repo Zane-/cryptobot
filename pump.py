@@ -1,5 +1,5 @@
 from time import sleep
-from trade import *
+import trade
 
 def main():
     ticker = input('TICKER: ')

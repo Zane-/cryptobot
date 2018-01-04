@@ -23,6 +23,7 @@ def liquidate_watching():
 
 
 def main():
+    eth = trade.fetch_balance('ETH')
     ticker = input('TICKER: ')
     ticker_data = trade.fetch_ticker(ticker)
     price = ticker_data['bid']
@@ -61,6 +62,5 @@ def main():
 
 if __name__ == '__main__':
     input("<[PUMP BOT 1.0 | PRESS ENTER TO START]>")
-    liquidate_watching()
-    eth = trade.fetch_balance('ETH')
+    #liquidate_watching()
     main() # start bot

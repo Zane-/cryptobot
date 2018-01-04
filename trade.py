@@ -16,7 +16,7 @@ def fetch_balance(ticker):
     while not balance_fetched:
         try:
             balance = float(binance.fetch_balance()[ticker]['free'])
-        except ccxt.NetworkError:
+        except ccxt.NetworkError as e:
             continue
         balance_fetched = True
     return balance
@@ -28,7 +28,7 @@ def fetch_ticker(ticker):
     while not ticker_fetched:
         try:
             data = binance.fetch_ticker(ticker)
-        except ccxt.NetworkError:
+        except ccxt.NetworkError as e:
             continue
         ticker_fetched = True
     return {'bid': float(data['bid']), 'change': float(data['change'])}
@@ -59,10 +59,10 @@ def sell(ticker, percent):
     while not sold:
         try:
             order = binance.create_market_sell_order(ticker, floor(fetch_balance(ticker[0:-4]) * (percent/100)))
-        except ccxt.ExchangeError:
+        except ccxt.ExchangeError as e:
             print(e)
             return None
-        except ccxt.NetworkError:
+        except ccxt.NetworkError as e:
             continue
         sold = True
     return order

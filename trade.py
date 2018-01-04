@@ -7,7 +7,7 @@ from auth import *
 
 
 WATCHING = ['ICX/ETH', 'TRX/ETH', 'XLM/ETH', 'ADA/ETH', 'IOTA/ETH', 'XRP/ETH', 'NAV/ETH', 'XVG/ETH']
-SELL_VOLUME = 0.3 # percent of volume to sell in the run function
+SELL_VOLUME = 30 # percent of volume to sell in the run function
 
 
 # Returns the total free balance of the ticker in the account.
@@ -50,7 +50,7 @@ def fetch_lowest_highest(data):
 # given percentage of the available balance.
 def sell(ticker, percent):
     try:
-        binance.create_market_sell_order(ticker, floor(fetch_balance(ticker[0:-4]) * percent))
+        binance.create_market_sell_order(ticker, floor(fetch_balance(ticker[0:-4]) * (percent/100)))
     except ccxt.ExchangeError:
         print(e)
     except ccxt.NetworkError:

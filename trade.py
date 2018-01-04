@@ -108,7 +108,7 @@ def get_last_row(filename):
 def initial_trading_strategy(num):
     data = get_watching_data()
     eth_per = get_ticker_balance('ETH') / num * 0.98
-    for x in range(0, num):
+    for _ in range(num):
         lowest, highest = get_lowest_highest(data)
         data.pop(lowest, None)
         data.pop(highest, None)
@@ -131,23 +131,23 @@ def main():
     initial_trading_strategy(2)
 
     # write data to CSV
-    row = (
-        str(datetime.now()),
-        lowest,
-        data[lowest]['change'],
-        second_lowest,
-        data[second_lowest]['change'],
-        second_highest,
-        data[second_highest]['change'],
-        highest,
-        data[highest]['change'],
-        round(get_portfolio(data), 2),
-        get_portfolio_change(data)
-    )
+    # row = (
+    #     str(datetime.now()),
+    #     lowest,
+    #     data[lowest]['change'],
+    #     second_lowest,
+    #     data[second_lowest]['change'],
+    #     second_highest,
+    #     data[second_highest]['change'],
+    #     highest,
+    #     data[highest]['change'],
+    #     round(get_portfolio(data), 2),
+    #     get_portfolio_change(data)
+    # )
 
-    with open('transactions.csv', 'a') as f:
-        writer = csv.writer(f, lineterminator='\n')
-        writer.writerow(row)
+    # with open('transactions.csv', 'a') as f:
+    #     writer = csv.writer(f, lineterminator='\n')
+    #     writer.writerow(row)
 
 
 if __name__ == '__main__':

@@ -104,30 +104,31 @@ def get_last_row(filename):
     with open(filename) as f:
         return deque(csv.reader(f), 1)[0]
 
+#generalizes the trading strategy
+def initial_trading_strategy(num):
+    data = get_watching_data()
+    eth_per = get_ticker_balance('ETH') / num * 0.98
+    for x in range(0, num):
+        lowest, highest = get_lowest_highest(data)
+        data.pop(lowest, None)
+        data.pop(highest, None)
+
+        try:
+            sell(highest, SELL_VOLUME)
+        except (BinanceAPIException, BinanceOrderException) as e:
+            print(e)
+            logging.exception("Sell order failed:")
+            return # do not proceed with buy because ETH balance did not get filled
+
+        try:
+            buy(lowest, data[lowest]['price'], eth_per)
+        except (BinanceAPIException, BinanceOrderException) as e:
+            print(e)
+            logging.exception("Buy order failed:")
 
 # Sells the two highest percent change cryptos and the buys the two lowest.
 def main():
-    data = get_watching_data()
-    lowest, highest = get_lowest_highest(data)
-    data_copy = data.copy()
-    data_copy.pop(lowest, None)
-    data_copy.pop(highest, None)
-    second_lowest, second_highest = get_lowest_highest(data_copy)
-
-    try:
-        sell(highest, SELL_VOLUME)
-        sell(second_highest, SELL_VOLUME)
-    except (BinanceAPIException, BinanceOrderException) as e:
-        print(e)
-        logging.exception("Sell order failed:")
-        return # do not proceed with buy because ETH balance did not get filled
-    try:
-        eth_per = get_ticker_balance('ETH') / 2 * 0.98
-        buy(lowest, data[lowest]['price'], eth_per)
-        buy(second_lowest, data[second_lowest]['price'], eth_per)
-    except (BinanceAPIException, BinanceOrderException) as e:
-        print(e)
-        logging.exception("Buy order failed:")
+    initial_trading_strategy(2)
 
     # write data to CSV
     row = (

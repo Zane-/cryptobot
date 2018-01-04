@@ -1,3 +1,4 @@
+from math import floor
 from time import sleep
 import trade
 

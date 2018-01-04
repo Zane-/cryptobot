@@ -14,6 +14,12 @@ def fetch_balance(ticker):
     return balance
 
 
+# Returns a list of tickers with non-zero balances  in the account.
+def fetch_nonzero_balances():
+    balances = exchange.fetch_balance()['total']
+    return [ticker for ticker in balances if balances[ticker] > 0]
+
+
 # Returns the price and 24hr change for the ticker.
 def fetch_ticker(ticker):
     ticker_fetched = False
@@ -47,9 +53,9 @@ def sell(ticker, percent):
     return order
 
 
-# Places a market limit sell order for the ticker using the
+# Places a limit sell order for the ticker using the
 # given percentage of the available balance.
-def limit_sell(ticker, price, percentage):
+def limit_sell(ticker, percentage, price):
     sell_placed = False
     while not sell_placed:
         try:
@@ -77,24 +83,48 @@ def sell_tickers(tickers, percent):
 # Places a market buy order for the ticker using the specified amount of USD in ether.
 # The price of the crypto is given to determine the volume to buy.
 def buy(ticker, price, eth):
-    vol_ticker = floor(eth / price)
+    amount = floor(eth / price)
     bought = False
     while not bought:
         try:
-            order = exchange.create_market_buy_order(ticker, vol_ticker * 0.98) # 98% for fees and fluctuations
+            order = exchange.create_market_buy_order(ticker, amount)
         except ccxt.InsufficientFunds as e:
-            price = price * 1.01
+            amount *= 0.99 # step down by 1% until order placed
             continue
         except ccxt.NetworkError as e:
+            print(e)
             continue
-        except ccxt.BaseError as e:
+        except ccxt.ExchangeError as e:
             print(e)
             return None
         bought = True
     return order
 
 
-# Places a market buy order for each of the cryptos in the data.
+# Places a limit buy order for the ticker.
+def limit_buy(ticker, amount, price):
+    buy_placed = False
+    while not buy_placed:
+        try:
+            order = exchange.create_limit_buy_order(
+                ticker,
+                amount,
+                price)
+        except ccxt.InsufficientFunds as e:
+            amount *= 0.99 # step down by 1% until order placed
+            continue
+        except ccxt.NetworkError as e:
+            print(e)
+            continue
+        except ccxt.ExchangeError as e:
+            print(e)
+            return None
+        buy_placed = True
+    return order
+
+
+# Places a market buy order for each of the cryptos in the data with
+# an equal amount of ether.
 def buy_tickers(data):
     eth_per = fetch_balance('ETH')  / len(data.keys())
     for ticker in data:
@@ -104,26 +134,15 @@ def buy_tickers(data):
 # Cancels all open orders for the given ticker.
 def cancel_open_orders(ticker):
     for order in exchange.fetch_open_orders(ticker):
-        exchange.cancel_order(order['prderId'], ticker)
+        exchange.cancel_order(order['info']['orderId'], ticker)
 
 
 # Cancels all open orders for the given tickers.
-def cancel_all_orders(tickers):
+# By default attempts to cancel all nonzero balance coins.
+def cancel_all_orders(tickers=None):
+    tickers = tickers if tickers is not None else fetch_nonzero_balances()
     for ticker in tickers:
         cancel_open_orders(ticker)
-
-
-# Returns a list of tickers with non-zero balances  in the account.
-def fetch_nonzero_balances(tickers):
-    balances = exchange.fetch_balance()
-    nonzero = []
-    for ticker in tickers:
-        try:
-            if balances[ticker]['total'] > 0:
-                nonzero.append(ticker)
-        except KeyError:
-            continue
-    return nonzero
 
 
 # Returns the equivalent USD amount of all cryptos in the account.
@@ -133,7 +152,6 @@ def get_portfolio(data):
     for ticker in data:
         total += eth_usd * fetch_balance(ticker[0:-4]) * data[ticker]['bid']
     return total
-
 
 
 # Places a market sell order for the full amount of each of the cryptos in WATCHING.

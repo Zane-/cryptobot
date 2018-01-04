@@ -1,37 +1,41 @@
 import csv
-import logging
 from collections import deque
 from datetime import datetime
 from math import floor
 
-from binance.exceptions import BinanceAPIException, BinanceOrderException
 from auth import *
 
-logging.basicConfig(level=logging.DEBUG, filename='bot.log')
 
-WATCHING = ['ICXETH', 'TRXETH', 'XLMETH', 'ADAETH', 'IOTAETH', 'XRPETH', 'NAVETH', 'XVGETH']
+WATCHING = ['ICX/ETH', 'TRX/ETH', 'XLM/ETH', 'ADA/ETH', 'IOTA/ETH', 'XRP/ETH', 'NAV/ETH', 'XVG/ETH']
 SELL_VOLUME = 0.3 # percent of volume to sell in the run function
 
 
 # Returns the total free balance of the ticker in the account.
-def get_ticker_balance(ticker):
-    return float(b.get_asset_balance(asset=ticker)['free'])
+def fetch_balance(ticker):
+    try:
+        balance = float(binance.fetch_balance()[ticker])
+    except ccxt.NetworkError:
+        fetch_balance(ticker)
+    return balance
 
 
 # Returns the price and 24hr change for the ticker.
-def get_ticker_data(ticker):
-    data = b.get_ticker(symbol=ticker)
-    return {'price': float(data['lastPrice']), 'change': float(data['priceChangePercent'])}
+def fetch_ticker(ticker):
+    try:
+        data = binance.fetch_ticker(ticker)
+    except ccxt.NetworkError:
+        fetch_ticker(ticker)
+    return {'bid': float(data['bid']), 'change': float(data['change'])}
 
 
-# Returns a dictionary w/ the prices and percent changes of all cryptos in WATCHING.
-def get_watching_data():
-    return {ticker: get_ticker_data(ticker) for ticker in WATCHING}
+# Returns a dictionary w/ the prices and percent changes of all cryptos passed in.
+def fetch_tickers(tickers):
+    return {ticker: fetch_ticker(ticker) for ticker in tickers}
 
 
 # Returns a tuple containing (lowest, highest) 24hr percent changes
 # among the cryptos in WATCHING.
-def get_lowest_highest(data):
+def fetch_lowest_highest(data):
     low, high = 0, 0
     for ticker in data:
         change = data[ticker]['change']
@@ -45,51 +49,50 @@ def get_lowest_highest(data):
 # Places a market sell order for the ticker using the
 # given percentage of the available balance.
 def sell(ticker, percent):
-    b.order_market_sell(
-        symbol=ticker,
-        quantity=floor(percent * get_ticker_balance(ticker[0:-3]))) # truncate ETH
+    try:
+        binance.create_market_sell_order(ticker, floor(fetch_balance(ticker[0:-4]) * percent))
+    except ccxt.ExchangeError:
+        print(e)
+    except ccxt.NetworkError:
+        sell(ticker, percent)
 
 
 # Places a market buy order for the ticker using the specified amount of USD in ether.
 # The price of the crypto is given to determine the volume to buy.
 def buy(ticker, price, eth):
     vol_ticker = floor(eth / price)
-    b.order_market_buy(
-        symbol=ticker,
-        quantity=floor(vol_ticker * 0.97)) # 97% for fees and price fluctuations
+    try:
+        binance.create_market_buy_order(ticker, vol_ticker * 0.98) # 98% for fees and fluctuations
+    except ccxt.InsufficientFunds as e:
+        buy(ticker, price*1.01, eth)
+    except ccxt.NetworkError as e:
+        buy(ticker, price, eth)
+    except ccxt.BaseError as e:
+        print(e)
 
 
 # Places a market buy order for each of the cryptos in WATCHING
 # for the specified amount of USD. Used to initially load bot.
-def buy_watching(data):
-    eth_per = get_ticker_balance('ETH') * 0.97 / len(WATCHING)
+def buy_tickers(data):
+    eth_per = fetch_balance('ETH')  / len(data.keys())
     for ticker in data:
-        try:
-            buy(ticker, data[ticker]['price'], eth_per)
-        except (BinanceAPIException, BinanceOrderException) as e:
-            print(e)
-            logging.exception("Buy order failed:")
+            buy(ticker, data[ticker]['bid'], eth_per)
 
 
 # Places a market sell order for the full amount of each of the cryptos in WATCHING.
 # Used to redistrubute total funds into all cryptos when distribution becomes too skewed.
 def redistribute_funds(data):
     for ticker in data:
-        try:
-            sell(ticker, 1.0)
-        except (BinanceAPIException, BinanceOrderException) as e:
-            print(e)
-            logging.exception("Redistribution failed:")
-    # error catching done in buy_watching()
-    buy_watching(data)
+        sell(ticker, 1.0)
+    buy_tickers(data)
 
 
 # Returns the equivalent USD amount of all cryptos in the account.
 def get_portfolio(data):
-    eth_usd = get_ticker_data('ETHUSDT')['price']
-    total = eth_usd * get_ticker_balance('ETH')
+    eth_usd = fetch_ticker('ETH/USDT')['bid']
+    total = eth_usd * fetch_balance('ETH')
     for ticker in data:
-        total += eth_usd * get_ticker_balance(ticker[0:-3]) * data[ticker]['price']
+        total += eth_usd * fetch_balance(ticker[0:-3]) * data[ticker]['bid']
     return total
 
 
@@ -104,31 +107,28 @@ def get_last_row(filename):
     with open(filename) as f:
         return deque(csv.reader(f), 1)[0]
 
-#generalizes the trading strategy
-def initial_trading_strategy(num):
-    data = get_watching_data()
-    eth_per = get_ticker_balance('ETH') / num * 0.98
+
+# Sells the num highest percent change cryptos and the buys the num lowest.
+def low_high_pair_strat(num, watching=WATCHING):
+    data = fetch_tickers(watching)
+    eth_per = fetch_balance('ETH') / num * 0.98
     for _ in range(num):
         lowest, highest = get_lowest_highest(data)
         data.pop(lowest, None)
         data.pop(highest, None)
-
         try:
             sell(highest, SELL_VOLUME)
-        except (BinanceAPIException, BinanceOrderException) as e:
+        except ccxt.ExchangeError as e:
             print(e)
-            logging.exception("Sell order failed:")
-            return # do not proceed with buy because ETH balance did not get filled
+            return # do not proceed with buy
+        buy(lowest, data[lowest]['bid'], eth_per)
 
-        try:
-            buy(lowest, data[lowest]['price'], eth_per)
-        except (BinanceAPIException, BinanceOrderException) as e:
-            print(e)
-            logging.exception("Buy order failed:")
 
-# Sells the two highest percent change cryptos and the buys the two lowest.
 def main():
-    initial_trading_strategy(2)
+    low_high_pair_strat(2)
+
+    # TODO:
+    # * dropbox integration here w/ csv
 
     # write data to CSV
     # row = (

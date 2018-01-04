@@ -3,8 +3,8 @@ from trade import *
 
 def main():
     ticker = input('TICKER: ')
-    ticker_data = trade.get_ticker_data(ticker)
-    price = ticker_data['price']
+    ticker_data = trade.fetch_ticker(ticker)
+    price = ticker_data['bid']
     trade.buy(ticker, price, eth)
 
     sell_percent = float(input('PERCENTAGE INCREASE TO SELL: '))
@@ -14,11 +14,11 @@ def main():
 
     while not sell_placed:
         try:
-            trade.b.order_limit_sell(
-                symbol=ticker,
-                quantity=floor(get_ticker_balance(ticker[0:-3])),
-                price=sell_price)
-        except (BinanceAPIException, BinanceOrderException) as e:
+            order = trade.binance.create_limit_sell_order(
+                ticker,
+                floor(fetch_balance(ticker[0:-4])),
+                sell_price)
+        except trade.ccxt.BaseError as e:
             print(e)
             continue
         sell_placed = True
@@ -30,28 +30,23 @@ def main():
     sell_change -= change_step
 
     # while it hasn't sold
-    while get_ticker_balance(ticker[0:-3] >= 1):
+    while fetch_balance(ticker[0:-4] >= 1):
         time.sleep(timeout)
         sell_price = price * (1 + sell_change/100)
-        trade.b.cancel_order(
-            symbol=ticker,
-            orderId=trade.b.get_open_orders(symbol=ticker)[0]['orderId'])
-        trade.b.order_limit_sell(
-                symbol=ticker,
-                quantity=floor(get_ticker_balance(ticker[0:-3])),
-                price=sell_price)
+        trade.binance.cancel_order(order['orderId'], ticker)
+        order = trade.binance.create_limit_sell_order(
+                ticker,
+                floor(get_ticker_balance(ticker[0:-3])),
+                sell_price)
         sell_change -= change_step
     ###                                                          ###
 
 def liquidate_watching():
     for ticker in trade.WATCHING:
-            try:
-                trade.sell(ticker, 100)
-            except (BinanceAPIException, BinanceOrderException) as e:
-                print(e)
+            trade.sell(ticker, 1.0)
 
 if __name__ == '__main__':
     input("<[PUMP BOT 1.0 | PRESS ENTER TO START]>")
     liquidate_watching()
-    eth = trade.get_ticker_balance('ETH')
+    eth = trade.fetch_balance('ETH')
     main() # start bot

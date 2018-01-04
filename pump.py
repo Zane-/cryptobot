@@ -7,7 +7,7 @@ def limit_sell(ticker, price):
         try:
             order = trade.binance.create_limit_sell_order(
                 ticker,
-                floor(fetch_balance(ticker[0:-4])),
+                floor(fetch_balance(ticker[0:-4]) * 0.985),
                 price)
         except trade.ccxt.BaseError as e:
             print(e)
@@ -18,7 +18,7 @@ def limit_sell(ticker, price):
 
 def liquidate_watching():
     for ticker in trade.WATCHING:
-            trade.sell(ticker, 1.0)
+            trade.sell(ticker, 100)
             print(order)
 
 

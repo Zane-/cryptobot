@@ -43,7 +43,7 @@ def main():
     sell_change -= change_step
 
     # while it hasn't sold
-    while trade.fetch_balance(ticker[0:-4] >= 1):
+    while trade.fetch_balance(ticker[0:-4]) >= 1):
         time.sleep(timeout)
         sell_price = price * (1 + sell_change/100)
         sell_canceled = False

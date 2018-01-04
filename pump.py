@@ -35,7 +35,7 @@ def main():
         sell_price = price * (1 + sell_change/100)
         trade.b.cancel_order(
             symbol=ticker,
-            orderId=trade.b.get_open_orders(symbol=ticker)[0]['clientOrderId'])
+            orderId=trade.b.get_open_orders(symbol=ticker)[0]['orderId'])
         trade.b.order_limit_sell(
                 symbol=ticker,
                 quantity=floor(get_ticker_balance(ticker[0:-3])),

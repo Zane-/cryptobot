@@ -141,16 +141,19 @@ def cancel_open_orders(ticker):
 # By default attempts to cancel all nonzero balance coins.
 def cancel_all_orders(tickers=None):
     tickers = tickers if tickers is not None else fetch_nonzero_balances()
+    tickers.remove('ETH')
     for ticker in tickers:
         cancel_open_orders(ticker)
 
 
 # Returns the equivalent USD amount of all cryptos in the account.
-def get_portfolio(data):
+def get_portfolio():
     eth_usd = fetch_ticker('ETH/USDT')['bid']
     total = eth_usd * fetch_balance('ETH')
-    for ticker in data:
-        total += eth_usd * fetch_balance(ticker[0:-4]) * data[ticker]['bid']
+    balances = fetch_nonzero_balances()
+    balances.remove('ETH')
+    for ticker in balances:
+        total += eth_usd * fetch_balance(ticker) * fetch_ticker(ticker + '/ETH')['bid']
     return total
 
 

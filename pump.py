@@ -10,7 +10,7 @@ def main(ticker, sell_percent, step_change, time_interval):
     ticker_data = fetch_ticker(ticker)
     price = ticker_data['bid']
     amount = eth / price
-    #buy(ticker, price, eth)
+    buy(ticker, price, eth)
 
     sell_change = sell_percent + ticker_data['change']
     sell_price = price * (1 + sell_change/100)

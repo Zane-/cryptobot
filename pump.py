@@ -43,6 +43,6 @@ if __name__ == '__main__':
     time_interval  = float(input("[PUMP BOT 1.0] | ENTER TIME INTERVAL (SEC) TO EXECUTE STEPS\n"))
     input("[PUMP BOT 1.0] | PRESS ENTER TO SELL COINS INTO ETHEREUM\n")
     cancel_all_orders()
-    liquidate_watching()
+    sell_tickers(fetch_nonzero_balances())
     ticker = input("[PUMP BOT 1.0] | ENTER THE TICKER AND PRESS ENTER TO START\n")
     main(ticker, sell_percent, step_change, time_interval) # start bot

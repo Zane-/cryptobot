@@ -1,3 +1,4 @@
+from datetime import datetime
 from exchange_utils import *
 
 
@@ -6,8 +7,10 @@ class LowHighPairStrat:
     WATCHING = ['ICX/ETH', 'TRX/ETH', 'XLM/ETH', 'ADA/ETH', 'IOTA/ETH', 'XRP/ETH', 'NAV/ETH', 'XVG/ETH']
     SELL_PERCENT = 30 # percent of volume to sell in the run function
 
-    def __init__(self, num, watching=WATCHING, sell_percent=SELL_percent):
+    # run_hours is a list of UTC hours the bot will run at
+    def __init__(self, num, run_hours, watching=WATCHING, sell_percent=SELL_percent):
         self.num = num
+        self.run_hours = run_hours
         self.watching = watching
         self.sell_percent = sell_percent
 
@@ -24,6 +27,10 @@ class LowHighPairStrat:
         return (lowest, highest)
 
     def start(self, num=None):
+        # op 2 line scheduler
+        if datetime.now().hour not in run_hours:
+            return
+
         num = self.num if not num else num
         data = fetch_tickers(watching)
         eth_per = fetch_balance('ETH') / num * 0.98
@@ -37,7 +44,3 @@ class LowHighPairStrat:
                 print(e)
                 return # do not proceed with buy
             buy(lowest, data[lowest]['bid'], eth_per)
-
-
-
-

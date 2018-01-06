@@ -74,11 +74,10 @@ def sell_tickers(tickers, percent, pair='ETH'):
         sell(ticker, percent, pair)
 
 
-# Places a market buy order for the ticker using the specified percentage of pair
-# currency. The bid of the ticker is given to determine the volume to buy. If
-# the order does not go through, an another is placed for 1% less volume.
+# Places a market buy order for the ticker using the specified percentage of the pair
+# currency. If the order does not go through, an another is placed for 1% less volume.
 def buy(ticker, percent, pair='ETH'):
-    amount = floor(fetch_balance(pair) / fetch_ticker(ticker)['bid'])
+    amount = floor(fetch_balance(pair) * (percent/pair) / fetch_ticker(ticker)['bid'])
     bought = False
     while not bought:
         try:
@@ -162,15 +161,24 @@ def cancel_all_orders(tickers=None):
         cancel_open_orders(ticker, 'BTC')
 
 
+# Returns the usd balance of the ticker.
+def get_usd_balance(ticker, pair='ETH'):
+    pair_usd = fetch_ticker(pair, 'USDT')['last']
+    return pair_usd * fetch_balance(ticker, 'total') * fetch_ticker(ticker, pair)['last']
+
+
 # Returns the equivalent USD amount of all cryptos in the account.
 def get_portfolio():
-    eth_usd = fetch_ticker('ETH/USDT')['bid']
-    total = eth_usd * fetch_balance('ETH', 'total')
+    eth_usd = fetch_ticker('ETH', 'USDT')['last']
+    eth_total = fetch_balance('ETH') * eth_usd
+    btc_usd = fetch_ticker('BTC', 'USDT')['last']
+    btc_total = fetch_balance('BTC') * btc_usd
+    total = eth_total + btc_total + fetch_balance('USDT')
     balances = fetch_nonzero_balances()
-    balances.remove('ETH')
-    for ticker in balances:
-        total += eth_usd * fetch_balance(ticker, 'total') * fetch_ticker(ticker + '/ETH')['bid']
-    return total
+    if 'ETH' in balances: balances.remove('ETH')
+    if 'BTC' in balances: balances.remove('BTC')
+    if 'USDT' in balances: balances.remove('USDT')
+    return total + sum(get_usd_balance(ticker) for ticker in balances)
 
 
 # Places a market sell order for the full amount of each of the cryptos in WATCHING.

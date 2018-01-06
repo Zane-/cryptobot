@@ -131,7 +131,7 @@ def swap(this, that, percent, pair='ETH'):
     order = sell(this, percent, pair)
     pair_amount = order['origQty'] * order['price']
     pair_percent = 100 * (pair_amount / fetch_balance(pair))
-    return buy(that, pair_percant, pair)
+    return buy(that, pair_percent, pair)
 
 
 # Swaps a given percentage of this for that. Sells this at the given percentage increase

@@ -15,6 +15,8 @@ def retry_on_exception(timeout, retries=10):
                     print(e)
                     sleep(timeout)
                     continue
+            print(f'{func.__name__} failed to execute after {retries} retries.')
+            return None
         return wrapper
     return decorator
 
@@ -26,6 +28,7 @@ def fetch_balance(ticker, account='free'):
 
 
 # Returns a list of tickers with non-zero balances (at least 1) in the account.
+# Does not list ETH or BTC (unless they are over 1).
 @retry_on_exception(2)
 def fetch_nonzero_balances():
     balances = exchange.fetch_balance()['total']
@@ -137,28 +140,31 @@ def swap(this, that, percent, pair='ETH'):
 # Swaps a given percentage of this for that. Sells this at the given percentage increase
 # and buys that at the given percentage decrease.
 def swap_limit(this, that, percentage, this_increase, that_decrease, pair='ETH'):
-    order = limit_sell(this, percentage, fetch_ticker(this)['bid'] * (that_increase/100))
+    order = limit_sell(this, percentage, fetch_ticker(this)['bid'] * (that_increase/100), pair)
     pair_amount = order['origQty'] * order['price']
     buy_price = fetch_ticker(that)['bid'] * (100-that_decrease/100)
     buy_amount = pair_amount / buy_price
     limit_buy(that, buy_amount, buy_price, pair)
 
 
-# Cancels all open orders for the given ticker.
+# Cancels an order given the order id, ticker, and pair.
 @retry_on_exception(2)
+def cancel_order(order_id, ticker, pair='ETH'):
+    exchange.cancel_order(order_id, ticker + f'/{pair}')
+
+
+# Cancels all open orders for the given ticker.
 def cancel_open_orders(ticker, pair='ETH'):
-    ticker = ticker + f'/{pair}'
-    for order in exchange.fetch_open_orders(ticker):
-        exchange.cancel_order(order['info']['orderId'], ticker)
+    for order in exchange.fetch_open_orders(ticker + f'/{pair}'):
+        cancel_order(order['info']['orderId'], ticker), pair
 
 
 # Cancels all open orders for the given tickers.
 # By default attempts to cancel all nonzero balance coins.
-def cancel_all_orders(tickers=None):
+def cancel_all_orders(tickers=None, pair='ETH'):
     tickers = tickers if tickers is not None else fetch_nonzero_balances()
     for ticker in tickers:
-        cancel_open_orders(ticker, 'ETH')
-        cancel_open_orders(ticker, 'BTC')
+        cancel_open_orders(ticker, pair)
 
 
 # Returns the usd balance of the ticker.

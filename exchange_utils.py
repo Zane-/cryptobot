@@ -1,93 +1,88 @@
 from math import floor
+from time import sleep
+
 from auth import *
 
 
-# Returns the total free balance of the ticker in the account.
-def fetch_balance(ticker):
-    balance_fetched = False
-    while not balance_fetched:
-        try:
-            balance = float(exchange.fetch_balance()[ticker]['free'])
-        except ccxt.NetworkError as e:
-            continue
-        balance_fetched = True
-    return balance
+# Exception decorator to retry functions upon ccxt exceptions
+def retry_on_exception(timeout, retries=10):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            for _ in range(retries):
+                try:
+                    return func(*args, **kwargs)
+                except (ccxt.NetworkError, ccxt.ExchangeError) as e:
+                    print(e)
+                    sleep(timeout)
+                    continue
+        return wrapper
+    return decorator
 
 
-# Returns a list of tickers with non-zero balances  in the account.
+# Returns the balance of the ticker in the account.
+@retry_on_exception(2)
+def fetch_balance(ticker, account='free'):
+    return float(exchange.fetch_balance()[ticker][account])
+
+
+# Returns a list of tickers with non-zero balances (at least 1) in the account.
+@retry_on_exception(2)
 def fetch_nonzero_balances():
     balances = exchange.fetch_balance()['total']
-    return [ticker for ticker in balances if balances[ticker] > 0]
+    return [ticker for ticker in balances.keys() if balances[ticker] >= 1]
 
 
-# Returns the price and 24hr change for the ticker.
-def fetch_ticker(ticker):
-    ticker_fetched = False
-    while not ticker_fetched:
-        try:
-            data = exchange.fetch_ticker(ticker)
-        except ccxt.NetworkError as e:
-            continue
-        ticker_fetched = True
-    return {'bid': float(data['bid']), 'change': float(data['change'])}
+# Returns data for the ticker.
+@retry_on_exception(2)
+def fetch_ticker(ticker, pair='ETH'):
+    data = exchange.fetch_ticker(ticker + f'/{pair}')
+    return {'bid': float(data['bid']),           'change': float(data['change']),
+            'high': float(data['high']),         'low': float(data['low']),
+            'volume': float(data['baseVolume']), 'last': float(data['last'])}
 
 
 # Returns a dictionary w/ the prices and percent changes of all cryptos passed in.
-def fetch_tickers(tickers):
-    return {ticker: fetch_ticker(ticker) for ticker in tickers}
+def fetch_tickers(tickers, pair='ETH'):
+    return {ticker: fetch_ticker(ticker, pair) for ticker in tickers}
 
 
 # Places a market sell order for the ticker using the
 # given percentage of the available balance.
-def sell(ticker, percent):
-    sold = False
-    while not sold:
-        try:
-            order = exchange.create_market_sell_order(ticker, floor(fetch_balance(ticker[0:-4]) * (percent/100)))
-        except ccxt.ExchangeError as e:
-            print(e)
-            return None
-        except ccxt.NetworkError as e:
-            continue
-        sold = True
+@retry_on_exception(2)
+def sell(ticker, percent, pair='ETH'):
+    order = exchange.create_market_sell_order(
+                ticker + f'/{pair}',
+                floor(fetch_balance(ticker) * (percent/100)))
     return order
 
 
 # Places a limit sell order for the ticker using the
 # given percentage of the available balance.
-def limit_sell(ticker, percentage, price):
-    sell_placed = False
-    while not sell_placed:
-        try:
-            order = exchange.create_limit_sell_order(
-                ticker,
-                floor(fetch_balance(ticker[0:-4]) * (percentage/100)),
-                price)
-        except ccxt.ExchangeError as e:
-            print(e)
-            return None
-        except ccxt.NetworkError as e:
-            print(e)
-            continue
-        sell_placed = True
+@retry_on_exception(2)
+def limit_sell(ticker, percent, price, pair='ETH'):
+    order = exchange.create_limit_sell_order(
+        ticker + f'/{pair}',
+        floor(fetch_balance(ticker) * (percent/100)),
+        price)
     return order
 
 
 # Places a market sell order for each of the tickers at the given percentage of
 # the total balance.
-def sell_tickers(tickers, percent):
+def sell_tickers(tickers, percent, pair='ETH'):
     for ticker in data:
-        sell(ticker, percent)
+        sell(ticker, percent, pair)
 
 
-# Places a market buy order for the ticker using the specified amount of USD in ether.
-# The price of the crypto is given to determine the volume to buy.
-def buy(ticker, price, eth):
-    amount = floor(eth / price)
+# Places a market buy order for the ticker using the specified percentage of pair
+# currency. The bid of the ticker is given to determine the volume to buy. If
+# the order does not go through, an another is placed for 1% less volume.
+def buy(ticker, percent, pair='ETH'):
+    amount = floor(fetch_balance(pair) / fetch_ticker(ticker)['bid'])
     bought = False
     while not bought:
         try:
-            order = exchange.create_market_buy_order(ticker, amount)
+            order = exchange.create_market_buy_order(ticker + f'/{pair}', amount)
         except ccxt.InsufficientFunds as e:
             amount *= 0.99 # step down by 1% until order placed
             continue
@@ -101,13 +96,14 @@ def buy(ticker, price, eth):
     return order
 
 
-# Places a limit buy order for the ticker.
-def limit_buy(ticker, amount, price):
+# Places a limit buy order for the ticker. If the order does
+# not go through, another is placed for 1% less volume.
+def limit_buy(ticker, amount, price, pair='ETH'):
     buy_placed = False
     while not buy_placed:
         try:
             order = exchange.create_limit_buy_order(
-                ticker,
+                ticker + f'/{pair}',
                 amount,
                 price)
         except ccxt.InsufficientFunds as e:
@@ -125,14 +121,34 @@ def limit_buy(ticker, amount, price):
 
 # Places a market buy order for each of the cryptos in the data with
 # an equal amount of ether.
-def buy_tickers(data):
-    eth_per = fetch_balance('ETH')  / len(data.keys())
-    for ticker in data:
-            buy(ticker, data[ticker]['bid'], eth_per)
+def buy_tickers(tickers, pair='ETH'):
+    pair_per = fetch_balance(pair) / len(tickers)
+    for ticker in tickers:
+        buy(ticker, fetch_ticker(ticker)['bid'], pair_per, pair)
+
+
+# Swaps a given percentage of one currency into another at market.
+def swap(this, that, percent, pair='ETH'):
+    order = sell(this, percent, pair)
+    pair_amount = order['origQty'] * order['price']
+    pair_percent = 100 * (pair_amount / fetch_balance(pair))
+    return buy(that, pair_percant, pair)
+
+
+# Swaps a given percentage of this for that. Sells this at the given percentage increase
+# and buys that at the given percentage decrease.
+def swap_limit(this, that, percentage, this_increase, that_decrease, pair='ETH'):
+    order = limit_sell(this, percentage, fetch_ticker(this)['bid'] * (that_increase/100))
+    pair_amount = order['origQty'] * order['price']
+    buy_price = fetch_ticker(that)['bid'] * (100-that_decrease/100)
+    buy_amount = pair_amount / buy_price
+    limit_buy(that, buy_amount, buy_price, pair)
 
 
 # Cancels all open orders for the given ticker.
-def cancel_open_orders(ticker):
+@retry_on_exception(2)
+def cancel_open_orders(ticker, pair='ETH'):
+    ticker = ticker + f'/{pair}'
     for order in exchange.fetch_open_orders(ticker):
         exchange.cancel_order(order['info']['orderId'], ticker)
 
@@ -141,24 +157,25 @@ def cancel_open_orders(ticker):
 # By default attempts to cancel all nonzero balance coins.
 def cancel_all_orders(tickers=None):
     tickers = tickers if tickers is not None else fetch_nonzero_balances()
-    tickers.remove('ETH')
     for ticker in tickers:
-        cancel_open_orders(ticker)
+        cancel_open_orders(ticker, 'ETH')
+        cancel_open_orders(ticker, 'BTC')
 
 
 # Returns the equivalent USD amount of all cryptos in the account.
 def get_portfolio():
     eth_usd = fetch_ticker('ETH/USDT')['bid']
-    total = eth_usd * fetch_balance('ETH')
+    total = eth_usd * fetch_balance('ETH', 'total')
     balances = fetch_nonzero_balances()
     balances.remove('ETH')
     for ticker in balances:
-        total += eth_usd * fetch_balance(ticker) * fetch_ticker(ticker + '/ETH')['bid']
+        total += eth_usd * fetch_balance(ticker, 'total') * fetch_ticker(ticker + '/ETH')['bid']
     return total
 
 
 # Places a market sell order for the full amount of each of the cryptos in WATCHING.
 # Used to redistrubute total funds into all cryptos when distribution becomes too skewed.
-def redistribute_funds(data):
-    sell_tickers(data.keys())
-    buy_tickers(data)
+def normalize_balances(pair='ETH'):
+    tickers = fetch_nonzero_balances()
+    sell_tickers(tickers, 100, pair)
+    buy_tickers(tickers, pair)

@@ -15,16 +15,16 @@ def main(ticker, sell_percent, pair_percent, step_change, time_interval, pair):
         sell_change -= step_change
 
 if __name__ == '__main__':
-    cancel_all_orders()
     sell_percent   = float(input('ENTER PERCENTAGE INCREASE TO SELL:\n'))
     step_change    = float(input('ENTER PERCENTAGE DECREASE STEP CHANGE:\n'))
     time_interval  = float(input('ENTER TIME INTERVAL (SEC) TO EXECUTE STEPS:\n'))
     vol_percent    = float(input('ENTER % OF ASSETS YOU WOULD LIKE TO RISK:\n'))
     pair           = input('ENTER PAIR (BTC | ETH):\n')
     input(f'PRESS ENTER TO SELL {vol_percent}% OF ALL ASSETS INTO {pair.upper()}:\n')
+    cancel_all_orders()
     pair = pair.upper()
     pair_before = fetch_balance(pair)
-    pair_amount = pair_before * vol_percent
+    pair_amount = pair_before * (vol_percent/100)
     sell_tickers(fetch_nonzero_balances(), vol_percent, pair=pair)
     pair_after = fetch_balance(pair)
     pair_percent = (pair_amount + pair_after - pair_before) / pair_after

@@ -73,13 +73,12 @@ def limit_sell(ticker, percent, price, pair='ETH'):
 # Places a market sell order for each of the tickers at the given percentage of
 # the total balance.
 def sell_tickers(tickers, percent, pair='ETH'):
-    for ticker in data:
-        sell(ticker, percent, pair)
+    return [sell(ticker, percent, pair) for ticker in tickers]
 
 
 # Places a market buy order for the ticker using the specified percentage of the pair
 # currency. If the order does not go through, an another is placed for 1% less volume.
-def buy(ticker, percent, pair='ETH'):
+def buy(ticker, pair_percent, pair='ETH'):
     amount = floor(fetch_balance(pair) * (percent/pair) / fetch_ticker(ticker)['bid'])
     bought = False
     while not bought:
@@ -100,7 +99,8 @@ def buy(ticker, percent, pair='ETH'):
 
 # Places a limit buy order for the ticker. If the order does
 # not go through, another is placed for 1% less volume.
-def limit_buy(ticker, amount, price, pair='ETH'):
+def limit_buy(ticker, pair_percent, price, pair='ETH'):
+    amount = floor(fetch_balance(pair) * (pair_percent/100) * price
     buy_placed = False
     while not buy_placed:
         try:
@@ -124,27 +124,28 @@ def limit_buy(ticker, amount, price, pair='ETH'):
 # Places a market buy order for each of the cryptos in the data with
 # an equal amount of ether.
 def buy_tickers(tickers, pair='ETH'):
-    pair_per = fetch_balance(pair) / len(tickers)
-    for ticker in tickers:
-        buy(ticker, fetch_ticker(ticker)['bid'], pair_per, pair)
+    pair_percentage = 100 / len(tickers)
+    return [buy(ticker, pair_percentage, pair) for ticker in tickers]
 
 
 # Swaps a given percentage of one currency into another at market.
 def swap(this, that, percent, pair='ETH'):
-    order = sell(this, percent, pair)
-    pair_amount = order['origQty'] * order['price']
-    pair_percent = 100 * (pair_amount / fetch_balance(pair))
-    return buy(that, pair_percent, pair)
+    sell = sell(this, percent, pair)
+    pair_amount = sell['origQty'] * sell['price']
+    pair_percent = pair_amount / fetch_balance(pair) * 100
+    buy = buy(that, pair_percent, pair)
+    return (sell, buy)
 
 
 # Swaps a given percentage of this for that. Sells this at the given percentage increase
 # and buys that at the given percentage decrease.
 def swap_limit(this, that, percentage, this_increase, that_decrease, pair='ETH'):
-    order = limit_sell(this, percentage, fetch_ticker(this)['bid'] * (that_increase/100), pair)
-    pair_amount = order['origQty'] * order['price']
+    sell = limit_sell(this, percentage, fetch_ticker(this)['bid'] * (that_increase/100), pair)
+    pair_amount = sell['origQty'] * sell['price']
     buy_price = fetch_ticker(that)['bid'] * (100-that_decrease/100)
-    buy_amount = pair_amount / buy_price
-    limit_buy(that, buy_amount, buy_price, pair)
+    pair_percent = pair_amount / fetch_balance(pair) * 100
+    buy = limit_buy(that, pair_percent, buy_price, pair)
+    return (sell, buy)
 
 
 # Cancels an order given the order id, ticker, and pair.
@@ -191,5 +192,6 @@ def get_portfolio():
 # Used to redistrubute total funds into all cryptos when distribution becomes too skewed.
 def normalize_balances(pair='ETH'):
     tickers = fetch_nonzero_balances()
-    sell_tickers(tickers, 100, pair)
-    buy_tickers(tickers, pair)
+    sells = sell_tickers(tickers, 100, pair)
+    buys = buy_tickers(tickers, pair)
+    return (sells, buys)

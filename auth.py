@@ -12,4 +12,6 @@ exchange = ccxt.binance({
     'apiKey': keys['binance']['api_key'],
     'secret': keys['binance']['api_secret'],
 })
+
+exchange.load_markets()
 #####~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#####

@@ -1,8 +1,8 @@
-from strategies import LowHighPairStrat
+from strategies import LowHighPairBot
 
 
 def main():
-    bot = LowHighPairStrat(2, [0, 6, 12, 18])
+    bot = LowHighPairBot(2, [0, 6, 12, 18])
     bot.start()
 
 

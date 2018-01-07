@@ -28,10 +28,14 @@ def fetch_balance(ticker, account='free'):
 
 
 # Returns a list of tickers with non-zero balances (at least 1) in the account.
-# Does not list ETH or BTC (unless they are over 1).
+# Does not list ETH, BTC, or USDT.
 @retry_on_exception(2)
 def fetch_nonzero_balances():
     balances = exchange.fetch_balance()['total']
+    balances.pop('ETH', None)
+    balances.pop('BTC', None)
+    balances.pop('USDT', None)
+    balances.pop('BNB', None)
     return [ticker for ticker in balances.keys() if balances[ticker] >= 1]
 
 
@@ -77,18 +81,22 @@ def sell_tickers(tickers, percent, pair='ETH'):
 
 
 # Places a market buy order for the ticker using the specified percentage of the pair
-# currency. If the order does not go through, an another is placed for 1% less volume.
-def buy(ticker, pair_percent, pair='ETH'):
+# currency. If the order does not go through, and auto_adjust is True,
+#  another is placed for 1% less volume.
+def buy(ticker, pair_percent, pair='ETH', auto_adjust=True):
     amount = floor(fetch_balance(pair) * (percent/pair) / fetch_ticker(ticker)['bid'])
     bought = False
     while not bought:
         try:
             order = exchange.create_market_buy_order(ticker + f'/{pair}', amount)
         except ccxt.InsufficientFunds as e:
-            amount *= 0.99 # step down by 1% until order placed
+            if auto_adjust:
+                amount *= 0.99 # step down by 1% until order placed
+            sleep(1)
             continue
         except ccxt.NetworkError as e:
             print(e)
+            sleep(1)
             continue
         except ccxt.ExchangeError as e:
             print(e)
@@ -98,9 +106,9 @@ def buy(ticker, pair_percent, pair='ETH'):
 
 
 # Places a limit buy order for the ticker. If the order does
-# not go through, another is placed for 1% less volume.
-def limit_buy(ticker, pair_percent, price, pair='ETH'):
-    amount = floor(fetch_balance(pair) * (pair_percent/100) * price
+# not go through, and auto_adjust is True, another is placed for 1% less volume.
+def limit_buy(ticker, pair_percent, price, pair='ETH', auto_adjust=True):
+    amount = floor(fetch_balance(pair) * (pair_percent/100) / price)
     buy_placed = False
     while not buy_placed:
         try:
@@ -108,15 +116,15 @@ def limit_buy(ticker, pair_percent, price, pair='ETH'):
                 ticker + f'/{pair}',
                 amount,
                 price)
-        except ccxt.InsufficientFunds as e:
-            amount *= 0.99 # step down by 1% until order placed
+        except ccxt.ExchangeError as e:
+            if auto_adjust:
+                amount *= 0.99 # step down by 1% until order placed
+            sleep(1)
             continue
         except ccxt.NetworkError as e:
             print(e)
+            sleep(1)
             continue
-        except ccxt.ExchangeError as e:
-            print(e)
-            return None
         buy_placed = True
     return order
 
@@ -157,15 +165,16 @@ def cancel_order(order_id, ticker, pair='ETH'):
 # Cancels all open orders for the given ticker.
 def cancel_open_orders(ticker, pair='ETH'):
     for order in exchange.fetch_open_orders(ticker + f'/{pair}'):
-        cancel_order(order['info']['orderId'], ticker), pair
+        cancel_order(order['info']['orderId'], ticker, pair)
 
 
 # Cancels all open orders for the given tickers.
 # By default attempts to cancel all nonzero balance coins.
-def cancel_all_orders(tickers=None, pair='ETH'):
+def cancel_all_orders(tickers=None):
     tickers = tickers if tickers is not None else fetch_nonzero_balances()
     for ticker in tickers:
-        cancel_open_orders(ticker, pair)
+        cancel_open_orders(ticker, 'ETH')
+        cancel_open_orders(ticker, 'BTC')
 
 
 # Returns the usd balance of the ticker.
@@ -180,12 +189,12 @@ def get_portfolio():
     eth_total = fetch_balance('ETH') * eth_usd
     btc_usd = fetch_ticker('BTC', 'USDT')['last']
     btc_total = fetch_balance('BTC') * btc_usd
-    total = eth_total + btc_total + fetch_balance('USDT')
+    bnb_usd = fetch_ticker('BNB', 'USDT')['last']
+    bnb_total = fetch_balance('BNB') * bnb_usd
+    # sum of pairs
+    pair_total = eth_total + btc_total + bnb_total + fetch_balance('USDT')
     balances = fetch_nonzero_balances()
-    if 'ETH' in balances: balances.remove('ETH')
-    if 'BTC' in balances: balances.remove('BTC')
-    if 'USDT' in balances: balances.remove('USDT')
-    return total + sum(get_usd_balance(ticker) for ticker in balances)
+    return pair_total + sum(get_usd_balance(ticker) for ticker in balances)
 
 
 # Places a market sell order for the full amount of each of the cryptos in WATCHING.

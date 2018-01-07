@@ -4,16 +4,18 @@ from exchange_utils import *
 
 def main(ticker, sell_percent, pair_percent, step_change, time_interval, pair):
     ticker_data = fetch_ticker(ticker, pair)
-    price = ticker_data['last']
+    price = ticker_data['bid']
     pair_start = fetch_balance(pair)
-    # buy_order = limit_buy(ticker, pair_percent, price, pair)
-    # buy_quantity = buy_order['info']['origQty']
-    # buy_price = buy_order['info']['price']
+    buy_order = limit_buy(ticker, pair_percent, price, pair)
+    buy_quantity = buy_order['info']['origQty']
+    buy_price = buy_order['info']['price']
     print(f'[+] BUY ORDER PLACED')
     # do not proceed until buy order is filled
     while len(exchange.fetch_open_orders(ticker + f'/{pair}')) > 0:
         print('[-] ORDER NOT FILLED')
-    # print(f'[+] BOUGHT {buy_quantity} {ticker} AT {buy_price}')
+    print(f'[+] BOUGHT {buy_quantity} {ticker} AT {buy_price}')
+    # percentage is calculated from change when the ticker was entered
+    # if you are slow on the enter, it could already be pumped up from what it was
     sell_change = sell_percent + ticker_data['change']
     # keep decreasing percent change until everything is sold
     try:
@@ -30,7 +32,7 @@ def main(ticker, sell_percent, pair_percent, step_change, time_interval, pair):
             sell_change -= step_change
     except (KeyboardInterrupt, EOFError):
         cancel_open_orders(ticker)
-        # sell_order = sell(ticker, 100)
+        sell_order = sell(ticker, 100)
         percent = fetch_ticker(ticker)['change']
         print(f'[-] SOLD THAT SHIT AT {percent}%\nDEVIANCE FROM GOAL: {sell_percent-percent}%')
         sys.exit()

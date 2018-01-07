@@ -26,7 +26,11 @@ if __name__ == '__main__':
     step_change    = float(input('ENTER PERCENTAGE DECREASE STEP CHANGE:\n'))
     time_interval  = float(input('ENTER TIME INTERVAL (SEC) TO EXECUTE STEPS:\n'))
     vol_percent    = float(input('ENTER % OF ASSETS YOU WOULD LIKE TO RISK:\n'))
+<<<<<<< HEAD
     pair           = input('ENTER PAIR (BTC|ETH):\n').upper()
+=======
+    pair           = input('ENTER PAIR (BTC|ETH):\n').upper()
+>>>>>>> ac38cb5adcad08dc58978d9d3cf973aed45bbe18
     input(f'PRESS ENTER TO SELL {vol_percent}% OF ALL ASSETS INTO {pair}:\n')
     cancel_all_orders()
     pair_before = fetch_balance(pair)

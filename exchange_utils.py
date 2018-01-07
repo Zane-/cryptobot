@@ -181,18 +181,16 @@ def get_usd_balance(ticker, pair='ETH'):
     return pair_usd * fetch_balance(ticker, 'total') * fetch_ticker(ticker, pair)['last']
 
 
+# Returns the usd balance for a given pair (BTC|ETH|USDT|BNB)
+def get_pair_usd_balance(pair):
+    return fetch_balance(pair, 'total') * fetch_ticker(pair, 'USDT')['last']
+
+
 # Returns the equivalent USD amount of all cryptos in the account.
 def get_portfolio():
-    eth_usd = fetch_ticker('ETH', 'USDT')['last']
-    eth_total = fetch_balance('ETH') * eth_usd
-    btc_usd = fetch_ticker('BTC', 'USDT')['last']
-    btc_total = fetch_balance('BTC') * btc_usd
-    bnb_usd = fetch_ticker('BNB', 'USDT')['last']
-    bnb_total = fetch_balance('BNB') * bnb_usd
-    # sum of pairs
-    pair_total = eth_total + btc_total + bnb_total + fetch_balance('USDT')
+    pair_total = get_pair_usd_balance('ETH') + get_pair_usd_balance('BTC') + get_pair_usd_balance('BNB') + fetch_balance('USDT')
     balances = fetch_nonzero_balances()
-    return pair_total + sum(get_usd_balance(ticker) for ticker in balances)
+    return round(pair_total + sum(get_usd_balance(ticker) for ticker in balances), 2)
 
 
 # Places a market sell order for the full amount of each of the cryptos in WATCHING.

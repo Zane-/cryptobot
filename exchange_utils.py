@@ -28,7 +28,7 @@ def fetch_balance(ticker, account='free'):
 
 
 # Returns a list of tickers with non-zero balances (at least 1) in the account.
-# Does not list ETH, BTC, or USDT.
+# Does not list ETH, BTC, BNB, or USDT.
 @retry_on_exception(2)
 def fetch_nonzero_balances():
     balances = exchange.fetch_balance()['total']
@@ -84,9 +84,9 @@ def sell_tickers(tickers, percent, pair='ETH'):
 # currency. If the order does not go through, and auto_adjust is True,
 #  another is placed for 1% less volume.
 def buy(ticker, pair_percent, pair='ETH', auto_adjust=True):
-    amount = floor(fetch_balance(pair) * (percent/pair) / fetch_ticker(ticker)['bid'])
-    bought = False
-    while not bought:
+    amount = floor(fetch_balance(pair) * (pair_percent/100) / fetch_ticker(ticker)['last'])
+    buy_placed = False
+    while not buy_placed:
         try:
             order = exchange.create_market_buy_order(ticker + f'/{pair}', amount)
         except ccxt.InsufficientFunds as e:
@@ -94,14 +94,13 @@ def buy(ticker, pair_percent, pair='ETH', auto_adjust=True):
                 amount *= 0.99 # step down by 1% until order placed
             sleep(1)
             continue
-        except ccxt.NetworkError as e:
+        except (ccxt.ExchangeError, ccxt.NetworkError) as e:
+            if auto_adjust and e.__class__.__name__ == 'ExchangeError':
+                amount *= 0.99 # step down by 1% until order placed
             print(e)
             sleep(1)
             continue
-        except ccxt.ExchangeError as e:
-            print(e)
-            return None
-        bought = True
+        buy_placed = True
     return order
 
 
@@ -116,12 +115,9 @@ def limit_buy(ticker, pair_percent, price, pair='ETH', auto_adjust=True):
                 ticker + f'/{pair}',
                 amount,
                 price)
-        except ccxt.ExchangeError as e:
-            if auto_adjust:
+        except (ccxt.ExchangeError, ccxt.NetworkError) as e:
+            if auto_adjust and e.__class__.__name__ == 'ExchangeError':
                 amount *= 0.99 # step down by 1% until order placed
-            sleep(1)
-            continue
-        except ccxt.NetworkError as e:
             print(e)
             sleep(1)
             continue
@@ -139,7 +135,7 @@ def buy_tickers(tickers, pair='ETH'):
 # Swaps a given percentage of one currency into another at market.
 def swap(this, that, percent, pair='ETH'):
     sell = sell(this, percent, pair)
-    pair_amount = sell['origQty'] * sell['price']
+    pair_amount = sell['info']['origQty'] * sell['info']['price']
     pair_percent = pair_amount / fetch_balance(pair) * 100
     buy = buy(that, pair_percent, pair)
     return (sell, buy)
@@ -149,7 +145,7 @@ def swap(this, that, percent, pair='ETH'):
 # and buys that at the given percentage decrease.
 def swap_limit(this, that, percentage, this_increase, that_decrease, pair='ETH'):
     sell = limit_sell(this, percentage, fetch_ticker(this)['bid'] * (that_increase/100), pair)
-    pair_amount = sell['origQty'] * sell['price']
+    pair_amount = sell['info']['origQty'] * sell['info']['price']
     buy_price = fetch_ticker(that)['bid'] * (100-that_decrease/100)
     pair_percent = pair_amount / fetch_balance(pair) * 100
     buy = limit_buy(that, pair_percent, buy_price, pair)
@@ -168,10 +164,12 @@ def cancel_open_orders(ticker, pair='ETH'):
         cancel_order(order['info']['orderId'], ticker, pair)
 
 
-# Cancels all open orders for the given tickers.
+# Cancels all open orders for the given tickers (For pairs ETH and BTC).
 # By default attempts to cancel all nonzero balance coins.
-def cancel_all_orders(tickers=None):
-    tickers = tickers if tickers is not None else fetch_nonzero_balances()
+# Pass in multiple tickers separated by commas, example:
+#   cancel_all_orders('TRX', 'ADA', 'ICX')
+def cancel_all_orders(*tickers):
+    tickers = tickers if len(tickers) > 0 else fetch_nonzero_balances()
     for ticker in tickers:
         cancel_open_orders(ticker, 'ETH')
         cancel_open_orders(ticker, 'BTC')

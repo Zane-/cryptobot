@@ -185,6 +185,8 @@ def get_usd_balance(ticker, pair='ETH'):
 def get_pair_usd_balance(pair):
     return fetch_balance(pair, 'total') * fetch_ticker(pair, 'USDT')['last']
 
+def get_pair_bnb_balance(pair):
+    return fetch_balance(pair, 'total') * fetch_ticker(pair, 'BNB')['last']
 
 # Returns the equivalent USD amount of all cryptos in the account.
 def get_portfolio():
@@ -200,3 +202,28 @@ def normalize_balances(pair='ETH'):
     sells = sell_tickers(tickers, 100, pair)
     buys = buy_tickers(tickers, pair)
     return (sells, buys)
+
+def find_dust()
+    coins = exchange.fetch_balance()['total']
+    coins.pop('ETH', None)
+    coins.pop('BTC', None)
+    coins.pop('USDT', None)
+    coins.pop('BNB', None)
+    return [ticker for ticker in coins.keys() if coins[ticker] < 1]
+
+def clean_dust()
+    dustcoins = find_dust()
+    for coin in dustcoins:
+        if get_pair_bnb_balance(coin) > 1:
+            sell(coin, 100, 'BNB')
+        else:
+            while get_pair_bnb_balance(coin) < 1:
+                try:
+                    exchange.create_market_buy_order(ticker + '/ETH', 1)
+                except ccxt.InsufficientFunds as e:
+                    print(e)
+                    return
+                except (ccxt.ExchangeError, ccxt.NetworkError) as e:
+                    print(e)
+                    return
+            sell(coin, 100, 'BNB')

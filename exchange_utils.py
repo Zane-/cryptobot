@@ -203,6 +203,7 @@ def normalize_balances(pair='ETH'):
     buys = buy_tickers(tickers, pair)
     return (sells, buys)
 
+#Returns the tickers for coin balances that are non-zero but under 1
 def find_dust()
     coins = exchange.fetch_balance()['total']
     coins.pop('ETH', None)
@@ -211,6 +212,10 @@ def find_dust()
     coins.pop('BNB', None)
     return [ticker for ticker in coins.keys() if coins[ticker] < 1]
 
+#Finds all coins that need to be dusted
+#For all coins worth above 1 BNB, sells immediately
+#Otherwise, adds 1 BNB of value to the coin balance until the balance is worth above 1 BNB
+#Then sells
 def clean_dust()
     dustcoins = find_dust()
     for coin in dustcoins:

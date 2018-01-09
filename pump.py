@@ -7,7 +7,7 @@ def main(ticker, change_before, sell_percent, pair_percent, step_change, time_in
     price = ticker_data['bid'] # use last bid to determine buy price
     pair_start = get_balance(pair)
 
-    buy_order = buy(ticker, pair, pair_percent, price, auto_adjust=True)
+    buy_order = buy(ticker, pair, pair_percent, price, auto_adjust=True, max_auto_iterations=10)
     print(f'[+] BUY ORDER PLACED {buy_order["amount"]} {ticker} AT {buy_order["price"]}')
     # do not proceed until buy order is filled
     while exchange.fetch_order(buy_order['id'], ticker + f'/{pair}')['status'] != 'closed':
@@ -60,7 +60,9 @@ if __name__ == '__main__':
         alt_percent = float(input(f'[+] ENTER % OF ALTS TO SELL INTO {pair}: '))
         pair_before = get_balance(pair)
         pair_amount = pair_before * (pair_percent/100)
-        sell_tickers(get_nonzero_balances(), pair, alt_percent, auto_adjust=True)
+        sells = sell_tickers(get_nonzero_balances(), pair, alt_percent, auto_adjust=True)
+        for order in sells:
+            print(f'[+] SOLD {order['']})
         pair_after = get_balance(pair)
         print(f'[+] SOLD ALTCOINS FOR A GAIN OF {pair_after-pair_before} {pair}')
         pair_percent = (pair_amount + pair_after - pair_before) / pair_after * 100

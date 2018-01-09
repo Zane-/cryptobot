@@ -172,13 +172,13 @@ def swap_limit(this, that, pair, percentage, this_increase, that_decrease, *, au
 #
 @retry_on_exception(2)
 def cancel_order(order, *, order_id=None, symbol=None):
-    symbol = order['info']['symbol'][::-1] # reverse to extract pair as first group
-    # symbol_regex = re.compile(r'(\w+)(BTC|ETH|BNB|USDT)')
-    symbol_regex = re.compile(r'(TDSU|BNB|HTE|CTB)(\w+)')
+    symbol = order['info']['symbol']
+    symbol_regex = re.compile(r'(\w+)(BTC|ETH|BNB|USDT)')
     match = symbol_regex.match(symbol)
     if match:
-        print(match)                       # reverse the symbol back
-        exchange.cancel_order(order['id'], match[1][::-1] + f'/{match[0][::-1]}')
+        print(match)
+        exchange.cancel_order(order['id'], match[1] + f'/{match[2]}')
+        return True
     return False
 
 

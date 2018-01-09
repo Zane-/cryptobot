@@ -54,7 +54,7 @@ def get_nonzero_balances(pairs=True):
 # Fractional returns whether or not the ticker can be sold in fractional amounts.
 @retry_on_exception(2)
 def get_ticker(ticker, pair='ETH'):
-    data = exchange.fetch_ticker(ticker + f'/{pair}')
+    data = exchange.fetch_ticker(f'{ticker}/{pair}')
     return {'bid': data['bid'],           'change': data['change'],
             'high': data['high'],         'low': data['low'],
             'volume': data['baseVolume'], 'last': data['last'],
@@ -70,7 +70,7 @@ def get_tickers(tickers, pair='ETH'):
 # given percentage of the available balance.
 @retry_on_exception(2)
 def sell(ticker, pair, percentage, price='market', *, auto_adjust=False):
-    symbol = ticker + f'/{pair}'
+    symbol = f'{ticker}/{pair}'
     ticker_data = get_ticker(ticker, pair)
     ticker_balance = get_balance(ticker)
 
@@ -113,7 +113,7 @@ def sell_tickers(tickers, pair, percentage, price='market', *, auto_adjust=False
 # given percentage of the available balance.
 @retry_on_exception(2)
 def buy(ticker, pair, percentage, price='market', *, auto_adjust=False):
-    symbol = ticker + f'/{pair}'
+    symbol = f'{ticker}/{pair}'
     ticker_data = get_ticker(ticker)
     price = ticker_data['last']
     pair_balance = get_balance(pair)
@@ -176,8 +176,8 @@ def cancel_order(order, *, order_id=None, symbol=None):
     symbol_regex = re.compile(r'(\w+)(BTC|ETH|BNB|USDT)')
     match = symbol_regex.match(symbol)
     if match:
-        print(match)
         exchange.cancel_order(order['id'], match[1] + f'/{match[2]}')
+        print(f'Cancelled order {order["id"]}: {order["amount"]} {symbol} at {order["price"]}')
         return True
     return False
 

@@ -2,33 +2,31 @@ import sys
 
 from exchange_utils import *
 
-def main(ticker, sell_percent, pair_percent, step_change, time_interval, pair):
+def main(ticker, change_before, sell_percent, pair_percent, step_change, time_interval, pair):
     ticker_data = get_ticker(ticker, pair)
-    price = ticker_data['bid']
+    price = ticker_data['bid'] # use last bid to determine buy price
     pair_start = get_balance(pair)
 
     buy_order = buy(ticker, pair, pair_percent, price, auto_adjust=True)
-    buy_quantity = buy_order['info']['origQty']
-    buy_price = buy_order['info']['price']
-    print(f'[+] BUY ORDER PLACED')
+    print(f'[+] BUY ORDER PLACED {buy_order["amount"]} {ticker} AT {buy_order["price"]}')
     # do not proceed until buy order is filled
-    while len(exchange.fetch_open_orders(ticker + f'/{pair}')) > 0:
+    while exchange.fetch_order(buy_order['id'], ticker + f'/{pair}')['status'] != 'closed':
         print('[-] ORDER NOT FILLED')
-    print(f'[+] BOUGHT {buy_quantity} {ticker} AT {buy_price}')
+    print('[+] ORDER FILLED')
     # percentage is calculated from change when the ticker was entered
     # if you are slow on the enter, it could already be pumped up from what it was
-    sell_change = sell_percent + ticker_data['change']
+    sell_change = sell_percent + change_before
     # keep decreasing percent change until everything is sold
     try:
         while get_balance(ticker, 'total') > 0:
             sell_price = price * (1 + sell_change/100)
             sell_order = sell(ticker, pair, 100, sell_price, auto_adjust=True)
-            print(f'[+] SELLING {sell_order["info"]["origQty"]} {ticker} at {sell_order["info"]["price"]}')
+            print(f'[+] SELLING {sell_order["amount"} {ticker} at {sell_order["price"]}')
             current_percent = get_ticker(ticker)['change']
-            print(f'[+] CURRENT PERCENTAGE: {current_percent}')
+            print(f'[+] CURRENT PERCENTAGE: {current_percent} PERCENT TIL TARGET: {sell_change - current_percent}')
             print('[-] WAITING . . . PRESS CTRL+C TO SELL AT MARKET')
             sleep(time_interval)
-            cancel_open_orders(ticker)
+            cancel_order(sell_order)
             print('[-] ORDER CANCELED')
             sell_change -= step_change
     except (KeyboardInterrupt, EOFError):
@@ -42,7 +40,9 @@ def main(ticker, sell_percent, pair_percent, step_change, time_interval, pair):
     print(f'[+] TOTAL PROFIT/LOSS: {get_balance(pair) / pair_start * 100 - 100}')
 
 if __name__ == '__main__':
-    print('[+] CANCELLING ALL ORDERS . . . ')
+    print('[+] PRELOADING TICKER DATA . . .')
+    ticker_data = exchange.fetch_tickers()
+    print('[+] CANCELLING ALL ORDERS . . .')
     cancel_all_orders()
     sell_percent   = float(input('[+] ENTER PERCENTAGE INCREASE TO SELL: '))
     step_change    = float(input('[+] ENTER PERCENTAGE DECREASE STEP CHANGE: '))
@@ -54,7 +54,7 @@ if __name__ == '__main__':
     while pair_percent < min_percent:
         print(f'[-] DOES NOT SATISFY MINIMUM ORDER REQUIREMENTS: MINIMUM IS {min_percent}%')
         pair_percent = float(input(f'[+] RE-ENTER % OF {pair} YOU WOULD LIKE TO RISK: '))
-    sell_alts = input(f'[+] WOULD YOU LIKE TO SELL ALTCOINS INTO {pair}? (y|n): ').upper()
+    sell_alts = input(f'[+] WOULD YOU LIKE TO SELL ALTCOINS INTO {pair}? (y|*): ').upper()
 
     if sell_alts == 'Y':
         alt_percent = float(input(f'[+] ENTER % OF ALTS TO SELL INTO {pair}: '))
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     pair_usd_total = get_ticker(pair, 'USDT')['last'] * pair_total
     print(f'[+] RISKING {pair_total} {pair} (${pair_usd_total})')
     ticker = input('[PUMP BOT READY] | ENTER TICKER TO START: ').upper()
-    while ticker + f'/{pair}' not in exchange.symbols: # validate ticker
+    while f'{ticker}/{pair}' not in exchange.symbols: # validate ticker
         ticker = input(f'[-] TICKER {ticker} NOT FOUND, PLEASE RE-ENTER: ').upper()
-
-    main(ticker, sell_percent, pair_percent, step_change, time_interval, pair)
+    change_before = ticker_data[f'{ticker}/{pair}']['change']
+    main(ticker, change_before, sell_percent, pair_percent, step_change, time_interval, pair)

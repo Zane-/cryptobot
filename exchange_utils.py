@@ -130,8 +130,8 @@ def sell(ticker, pair, percentage, price='market', *, auto_adjust=False, max_aut
 
 # Places a market sell order for each of the tickers at the given percentage of
 # the total balance.
-def sell_tickers(tickers, pair, percentage, price='market', *, auto_adjust=False):
-    return [sell(ticker, pair, percentage, price, auto_adjust=auto_adjust) for ticker in tickers]
+def sell_tickers(tickers, pair, percentage, price='market', *, auto_adjust=False, max_auto_iterations=3):
+    return [sell(ticker, pair, percentage, price, auto_adjust=auto_adjust, max_auto_iterations=max_auto_iterations) for ticker in tickers]
 
 
 # Places a buy order for the ticker and pair using the given percentage of the available balance
@@ -179,6 +179,16 @@ def buy(ticker, pair, percentage, price='market', *, auto_adjust=False, max_auto
                     amount += 1
                 else:
                     amount = roundup(amount * 1.05, exchange_config['precision'][symbol])
+            else:
+                return None
+        except ccxt.InsufficientFunds as e:
+            print(e)
+            if auto_adjust:
+                print('Retrying order . . .')
+                if exchange_config['precision'][symbol] == 0:
+                    amount -= 1
+                else:
+                    amount = roundup(amount * 0.99, exchange_config['precision'][symbol])
             else:
                 return None
 

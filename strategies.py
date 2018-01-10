@@ -53,7 +53,7 @@ class BinanceNewListingBot:
         self.interval = interval
         self.pair = pair
         self.percentage = percentage
-        sell.sell_after = sell_after
+        self.sell_after = sell_after
         self.sell_multiplier = sell_multiplier
         self.start_symbols = self.get_symbols()
 

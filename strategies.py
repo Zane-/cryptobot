@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from exchange_utils import *
 
 
@@ -10,7 +11,7 @@ class LowHighPairBot:
 
     def __init__(self, num, run_hours, pair='ETH', watching=WATCHING, sell_percent=SELL_PERCENT):
         self.num = num
-        self.run_hours = run_hours #list of UTC hours the bot will run at
+        self.run_hours = run_hours # list of UTC hours the bot will run at
         self.pair = pair
         self.watching = watching
         self.sell_percent = sell_percent
@@ -18,7 +19,7 @@ class LowHighPairBot:
     # Returns a tuple containing (lowest, highest) 24hr percent changes
     # among the cryptos in WATCHING.
     def get_lowest_highest(self, tickers):
-        tickers = fetch_tickers(tickers)
+        tickers = get_tickers(tickers)
         low, high = 0, 0
         for ticker in tickers.keys():
             change = tickers[ticker]['change']
@@ -48,10 +49,12 @@ class LowHighPairBot:
 
 
 class BinanceNewListingBot:
-    def __init__(self, interval, pair, percentage):
+    def __init__(self, interval, pair, percentage, *, sell_after=True, sell_multiplier=2):
         self.interval = interval
         self.pair = pair
         self.percentage = percentage
+        sell.sell_after = sell_after
+        self.sell_multiplier = sell_multiplier
         self.start_symbols = self.get_symbols()
 
     def get_symbols(self):
@@ -65,9 +68,12 @@ class BinanceNewListingBot:
     def run(self):
         difference = [s for s in self.get_symbols() if s not in self.start_symbols]
         if len(difference) > 0:
-            buy(difference[0][0:-4], self.pair, self.percentage, auto_adjust=True)
-            print(f'New currency detected: bought {difference[0][0:-4]} with {self.percentage} of {self.pair}')
-            return True
+            ticker = difference[0][:-4]
+            buy(ticker, self.pair, self.percentage, auto_adjust=True)
+            print(f'New currency detected: bought {ticker} with {self.percentage} of {self.pair}')
+            price = get_ticker(ticker)['bid']
+            if sell_after:
+                sell(ticker, self.pair, 100, price*sell_multiplier, auto_adjust=True)
 
     def start(self, *, interval=None):
         interval = self.interval if interval is None else interval

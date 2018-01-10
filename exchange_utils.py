@@ -5,27 +5,30 @@ from time import sleep
 from auth import *
 
 
-# Always rounds a floating number up to the specified digits.
+# Always rounds a floating number up to the specified precision.
 # Ex. round_up(12.344, 3) -> 12.345
-def round_up(n, digits):
-    x = 10**-digits
-    return round(ceil(n/x)*x, digits)
+def round_up(n, precision):
+    x = 10**-precision
+    return round(ceil(n/x)*x, precision)
+
+
+# Always rounds a floating number down to the specified precision.
+# Ex. round_up(12.346, 2) -> 12.34
+def round_down(n, precision):
+    x = 10**-precision
+    return round(floor(n/x)*x, precision)
 
 
 # Exception decorator to retry functions upon ccxt NetworkErrors.
-def retry_on_exception(timeout, retries=3):
+def retry_on_exception(interval, retries=3):
     def decorator(func):
         def wrapper(*args, **kwargs):
             for _ in range(retries):
                 try:
                     return func(*args, **kwargs)
                 except ccxt.NetworkError as e:
-                    print(e)
-                    sleep(timeout)
-                    continue
-                except ccxt.ExchangeError as e:
-                    print(e)
-                    return None
+                    print(f'A network error occured. Retrying in {interval} seconds.')
+                    sleep(interval)
             return None
         return wrapper
     return decorator
@@ -64,19 +67,18 @@ def get_ticker(ticker, pair='ETH'):
             'volume': data['quoteVolume'], 'last': data['last']}
 
 
-# Returns a dictionary w/ ticker data for each ticker passed in.
-def get_tickers(tickers, pair='ETH'):
-    return {ticker: get_ticker(ticker, pair) for ticker in tickers}
-
-
 # Returns a dictionary w/ data on all symbols on the exchange.
-# TODO: exchange.fetch_tickers() is way faster, use this and then just
-# prune it for the keys you want.
 def get_all_tickers():
+    data = exchange.fetch_tickers()
     tickers = {}
-    for symbol in exchange.symbols:
-        ticker, pair = symbol.split('/')
-        tickers[symbol] = get_ticker(ticker, pair)
+    for ticker in data:
+        tickers[ticker] = {}
+        tickers[ticker]['bid'] = data[ticker]['bid']
+        tickers[ticker]['change'] = data[ticker]['change']
+        tickers[ticker]['high'] = data[ticker]['high']
+        tickers[ticker]['low'] = data[ticker]['low']
+        tickers[ticker]['volume'] =  data[ticker]['quoteVolume']
+        tickers[ticker]['last'] = data[ticker]['last']
     return tickers
 
 
@@ -89,12 +91,9 @@ def sell(ticker, pair, percentage, price='market', *, auto_adjust=False):
     precision = exchange_config['precision'][symbol]
     pair_min = exchange_config['MINIMUM_AMOUNTS'][pair]
     # round down to the precision required
+    price = get_ticker(ticker)['bid'] if price == 'market' else price
     amount = round_down(get_balance(ticker) * percentage/100, precision)
-
-    if price == 'market':
-        min_amount = round_up(pair_min / get_ticker(ticker)['bid'], precision)
-    else:
-        min_amount = round_up(pair_min / price, precision)
+    min_amount = round_up(pair_min / price, precision)
 
     if amount < min_amount:
         if auto_adjust:
@@ -120,13 +119,10 @@ def buy(ticker, pair, percentage, price='market', *, auto_adjust=False):
     precision = exchange_config['precision'][symbol]
     pair_min = exchange_config['MINIMUM_AMOUNTS'][pair]
     # round down to the precision required
-    amount = round_down(get_balance(ticker) * percentage/100, precision)
-    bid = get_ticker(ticker)['bid']
-
-    if price == 'market':
-        min_amount = round_up(pair_min / bid, precision)
-    else:
-        min_amount = round_up(pair_min / price, precision)
+    pair_amount = round_down(get_balance(pair) * percentage/100, precision)
+    price = get_ticker(ticker)['bid'] if price == 'market' else price
+    amount = pair_amount / price
+    min_amount = round_up(pair_min / price, precision)
 
     if amount < min_amount:
         if auto_adjust:
@@ -134,7 +130,7 @@ def buy(ticker, pair, percentage, price='market', *, auto_adjust=False):
         else:
             raise ccxt.InvalidOrder(f'Order does not meet minimum requirement of {pair_min} {pair}')
 
-    if amount * bid > get_balance(pair):
+    if amount * price > get_balance(pair):
         raise ccxt.InsufficientFunds('Insufficient funds to place this order')
 
     if price == 'market':
@@ -143,32 +139,36 @@ def buy(ticker, pair, percentage, price='market', *, auto_adjust=False):
         return exchange.create_limit_buy_order(symbol, amount, price)
 
 
-# Swaps a given percentage of one currency into another at market.
-def swap(this, that, pair, percentage, *, auto_adjust=False):
-    sell = sell(this, pair, percentage, auto_adjust=auto_adjust)
-    pair_amount = sell['info']['origQty'] * sell['info']['price']
-    pair_percentage = pair_amount / get_balance(pair) * 100
-    buy = buy(that, pair, pair_amount / get_balance(pair) * 100, auto_adjust=auto_adjust)
-    return (sell, buy)
+# Swaps a given percentage this into that at market. This and that must
+# share a common pair.
+def swap(this, that, pair, percentage_this, *, auto_adjust=True):
+    if not (f'{this}/{pair}' and f'{that}/{pair}') in exchange.symbols:
+        raise ccxt.ExchangeError(f'{this} and {that} do not share the pair {pair}.')
+    sell_order = sell(this, pair, percentage_this, auto_adjust=auto_adjust)
 
-
-# Swaps a given percentage of this for that. Sells this at the given percentage increase
-# and buys that at the given percentage decrease.
-def swap_limit(this, that, pair, percentage, this_increase, that_decrease, *, auto_adjust=False):
-    sell_price = get_ticker(this)['bid'] * (100+that_increase/100)
-    sell = sell(this, pair, percentage, sell_price, auto_adjust=auto_adjust)
-
-    pair_amount = sell['info']['origQty'] * sell['info']['price']
+    pair_amount = sell_order['info']['origQty'] * sell['info']['price']
     pair_percentage = pair_amount / get_balance(pair) * 100
 
-    buy_price = get_ticker(that)['bid'] * (100-that_decrease)/100
-    buy = buy(that, pair, pair_percantage, buy_price, auto_adjust=auto_adjust)
-    return (sell, buy)
+    buy_order = buy(that, pair, pair_percentage, auto_adjust=auto_adjust)
+    return (sell_order, buy_order)
+
+
+# Returns all open orders for the ticker passed in. Returns a dictionary divided
+# into lists for buy and sell orders.
+@retry_on_exception(2)
+def get_open_orders(ticker):
+    orders = {'buy': [], 'sell': []}
+    symbols = [ticker + f'/BTC', ticker + f'/ETH', ticker + f'/BNB', ticker + f'/USDT']
+    for symbol in symbols:
+        if symbol in exchange.symbols:
+            for order in exchange.fetch_open_orders(symbol):
+                orders[order['side']].append(order)
+    return orders
 
 
 # Cancels an order given the order dictionary returned by buy/sell.
 @retry_on_exception(2)
-def cancel_order(order):
+def cancel(order):
     symbol = order['info']['symbol']
     symbol_regex = re.compile(r'(\w+)(BTC|ETH|BNB|USDT)')
     match = symbol_regex.match(symbol)
@@ -178,43 +178,50 @@ def cancel_order(order):
     return False
 
 
-# Cancels all open orders for the given ticker.
-def cancel_open_orders(ticker):
-    symbols = [ticker + f'/BTC', ticker + f'/ETH', ticker + f'/BNB', ticker + f'/USDT']
-    for symbol in symbols:
-        if symbol in exchange.symbols:
-            for order in exchange.fetch_open_orders(symbol):
-                cancel_order(order)
+# Cancels orders for the ticker on the specified side.
+# side='both' cancels all orders, side='buy' cancels buy,
+# side='sell cancels all sell orders.
+def cancel_orders(ticker, side='both'):
+    orders = get_open_orders(ticker)
+    if side == 'both':
+        cancels = []
+        cancels.extend(orders['sell'])
+        cancels.extend(orders['buy'])
+    else:
+        cancels = orders[side]
+    for order in cancels:
+        cancel(order)
 
 
-# Cancels all open orders for the given tickers (For pairs ETH and BTC).
+# Cancels all open orders for the given tickers (For pairs ETH and BTC)
+# on the given side.
 # By default attempts to cancel all nonzero balance coins.
-# Pass in multiple tickers separated by commas, example:
+# Pass in multiple tickers separated by commas, ex:
 #   cancel_all_orders('TRX', 'ADA', 'ICX')
-def cancel_all_orders(*tickers):
+def cancel_all_orders(*tickers, side='both'):
     tickers = tickers if len(tickers) > 0 else get_nonzero_balances(pairs=False).keys()
     for ticker in tickers:
-        cancel_open_orders(ticker)
+        cancel_orders(ticker, side)
 
 
 # Returns the usd balance of the asset.
 def get_usd_balance(asset):
     balance = get_balance(asset, 'total')
-    if asset + '/BTC' in exchange.symbols:
+    if f'{asset}/BTC' in exchange.symbols:
         btc_usd = get_ticker('BTC', 'USDT')['last']
         return get_ticker(asset, 'BTC')['last'] * balance * btc_usd
-    elif asset + '/ETH' in exchange.symbols:
+    elif f'{asset}/ETH' in exchange.symbols:
         eth_usd = get_ticker('ETH', 'USDT')['last']
         return get_ticker(asset, 'ETH')['last'] * balance * eth_usd
-    elif asset + '/BNB' in exchange.symbols:
+    elif f'{asset}/BNB' in exchange.symbols:
         bnb_usd = get_ticker('BNB', 'USDT')['last']
         return get_ticker(asset, 'BNB')['last'] * balance * bnb_usd
-    elif asset + '/USDT' in exchange.symbols:
+    elif f'{asset}/USDT' in exchange.symbols:
         return get_ticker(asset, 'USDT')['last'] * balance
     elif asset == 'USDT':
         return balance
     else:
-        return -1 # ticker not found value
+        return -1 # asset not found
 
 
 # Returns the equivalent USD amount of all cryptos in the account.

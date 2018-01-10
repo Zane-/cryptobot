@@ -6,10 +6,11 @@ from auth import *
 
 
 # Always rounds a floating number up to the specified digits.
-# Ex. roundup(12.344, 3) -> 12.345
-def roundup(n, digits):
+# Ex. round_up(12.344, 3) -> 12.345
+def round_up(n, digits):
     x = 10**-digits
-    return round(ceil(n / x) * x, digits)
+    return round(ceil(n/x)*x, digits)
+
 
 # Exception decorator to retry functions upon ccxt NetworkErrors.
 def retry_on_exception(timeout, retries=3):
@@ -25,7 +26,6 @@ def retry_on_exception(timeout, retries=3):
                 except ccxt.ExchangeError as e:
                     print(e)
                     return None
-            print(f'{func.__name__} failed to execute after {retries} retries.')
             return None
         return wrapper
     return decorator
@@ -70,6 +70,8 @@ def get_tickers(tickers, pair='ETH'):
 
 
 # Returns a dictionary w/ data on all symbols on the exchange.
+# TODO: exchange.fetch_tickers() is way faster, use this and then just
+# prune it for the keys you want.
 def get_all_tickers():
     tickers = {}
     for symbol in exchange.symbols:
@@ -78,125 +80,67 @@ def get_all_tickers():
     return tickers
 
 
-# Places sell order for the ticker and pair using the given percentage of the available balance
-# of the ticker. Pass in a price for the price parameter to post a limit order.
-# auto_adjust attmempts to bump the order up to the minimum amount if the order was invalid.
-# max_auto_iterations is the maximum number of iterations auto_adjust will attempt to increase the
-# amount to make the order valid.
-# (amount increase is 1 + 0.01 * max_auto_iterations for fractional assets, and simply an increase
-# of 1 on each iteration for non-fractional assets).
+# Places a sell order for the ticker and pair using the given percentage of the ticker.
+# Pass in a price for the price parameter to post a limit order.
+# auto_adjust sets the amount as the minimum amount if the minimum amount is not reached.
 @retry_on_exception(2)
-def sell(ticker, pair, percentage, price='market', *, auto_adjust=False, max_auto_iterations=3):
+def sell(ticker, pair, percentage, price='market', *, auto_adjust=False):
     symbol = f'{ticker}/{pair}'.upper()
-    ticker_data = get_ticker(ticker, pair)
-    ticker_balance = get_balance(ticker)
-    min_pair = exchange_config['MINIMUM_AMOUNTS'][pair.upper()]
-
-    if price == 'market':
-        price = ticker_data['last']
-
-    amount = ticker_balance * percentage/100
-    amount = round(amount, exchange_config['precision'][symbol])
-    sell_total = amount * price
-
-    if sell_total < min_pair:
-        min_amount = roundup(min_pair / price, exchange_config['precision'][symbol])
-        if min_amount <= ticker_balance and auto_adjust:
-                amount = min_amount
-        else:
-            min_percentage = min_amount / ticker_balance * 100
-            print((f'Order total does not meet minimum requirement of {min_pair} {pair}. '
-                   f'{min_percentage:.3f}% is the minimum needed. Pass in auto_adjust=True to attempt '
-                   f'to automatically adjust to this percent.'))
-            return None
-
-    for _ in range(max_auto_iterations): # attempts to re-place invalid orders (due to price fluctation)
-        try:
-            if price == 'market':
-                return exchange.create_market_sell_order(symbol, amount)
-            else:
-                return exchange.create_limit_sell_order(symbol, amount, price)
-        except ccxt.InvalidOrder as e: # may occur if price fluctuates too much, making the minimum amount too small
-            print(e)
-            if auto_adjust:
-                print('Retrying order . . .')
-                if exchange_config['precision'][symbol] == 0:
-                    amount += 1
-                else:
-                    amount = roundup(amount * 1.01, exchange_config['precision'][symbol])
-            else:
-                return None
-
-
-# Places a market sell order for each of the tickers at the given percentage of
-# the total balance.
-def sell_tickers(tickers, pair, percentage, price='market', *, auto_adjust=False, max_auto_iterations=3):
-    return [sell(ticker, pair, percentage, price, auto_adjust=auto_adjust, max_auto_iterations=max_auto_iterations) for ticker in tickers]
-
-
-# Places a buy order for the ticker and pair using the given percentage of the available balance
-# of the available balance of the paid. Pass in a price for the price parameter to post a limit order.
-# auto_adjust attmempts to bump the order up to the minimum amount if the order was invalid.
-# max_auto_iterations is the maximum number of iterations auto_adjust will attempt to increase the
-# amount to make the order valid.
-# (amount increase is 1 + 0.01 * max_auto_iterations for fractional assets, and simply an increase
-# of 1 on each iteration for non-fractional assets).
-@retry_on_exception(2)
-def buy(ticker, pair, percentage, price='market', *, auto_adjust=False, max_auto_iterations=3):
-    symbol = f'{ticker}/{pair}'
-    ticker_data = get_ticker(ticker)
-    if price == 'market':
-        price = ticker_data['last']
-    pair_balance = get_balance(pair)
-    pair_amount = pair_balance * (percentage/100)
+    precision = exchange_config['precision'][symbol]
     pair_min = exchange_config['MINIMUM_AMOUNTS'][pair]
+    # round down to the precision required
+    amount = round_down(get_balance(ticker) * percentage/100, precision)
 
-    amount = roundup(pair_amount / price, exchange_config['precision'][symbol])
-    pair_amount = amount * price
+    if price == 'market':
+        min_amount = round_up(pair_min / get_ticker(ticker)['bid'], precision)
+    else:
+        min_amount = round_up(pair_min / price, precision)
 
-    if pair_amount < pair_min:
-        print('here')
-        min_amount = roundup(pair_min / price, exchange_config['precision'][symbol])
-        if min_amount * price <= pair_balance and auto_adjust:
+    if amount < min_amount:
+        if auto_adjust:
             amount = min_amount
         else:
-            min_percentage = pair_min / pair_balance * 100
-            print((f'Order total does not meet minimum requirement of {pair_min} {pair}. '
-                   f'{min_percentage:.3f}% is the minimum needed. Pass in auto_adjust=True to attempt '
-                   f'to automatically adjust to this percent.'))
-            return None
+            raise ccxt.InvalidOrder(f'Order does not meet minimum requirement of {pair_min} {pair}')
 
-    for _ in range(max_auto_iterations): # attempts to re-place invalid orders (due to price fluctation)
-        try:
-            if price == 'market':
-                return exchange.create_market_buy_order(symbol, amount)
-            else:
-                return exchange.create_limit_buy_order(symbol, amount, price)
-        except ccxt.InvalidOrder as e: # may occur if price fluctuates too much, making the minimum amount too small
-            print(e)
-            if auto_adjust:
-                if exchange_config['precision'][symbol] == 0:
-                    amount += 1
-                else:
-                    amount = roundup(amount * 1.05, exchange_config['precision'][symbol])
-            else:
-                return None
-        except ccxt.InsufficientFunds as e:
-            print(e)
-            if auto_adjust:
-                print('Retrying order . . .')
-                if exchange_config['precision'][symbol] == 0:
-                    amount -= 1
-                else:
-                    amount = roundup(amount * 0.99, exchange_config['precision'][symbol])
-            else:
-                return None
+    if amount > get_balance(ticker):
+        raise ccxt.InsufficientFunds('Insufficient funds to place this order')
+
+    if price == 'market':
+        return exchange.create_market_sell_order(symbol, amount)
+    else:
+        return exchange.create_limit_sell_order(symbol, amount, price)
 
 
-# Places a market buy order for each of the tickers at the given percentage of
-# the total pair balance.
-def buy_tickers(tickers, pair, percentage, price='market', *, auto_adjust=False):
-    return [buy(ticker, pair, percentage, price, auto_adjust=auto_adjust) for ticker in tickers]
+# Places a buy order for the ticker and pair using the given percentage of the ticker.
+# Pass in a price for the price parameter to post a limit order.
+# auto_adjust sets the amount as the minimum amount if the minimum amount is not reached.
+@retry_on_exception(2)
+def buy(ticker, pair, percentage, price='market', *, auto_adjust=False):
+    symbol = f'{ticker}/{pair}'.upper()
+    precision = exchange_config['precision'][symbol]
+    pair_min = exchange_config['MINIMUM_AMOUNTS'][pair]
+    # round down to the precision required
+    amount = round_down(get_balance(ticker) * percentage/100, precision)
+    bid = get_ticker(ticker)['bid']
+
+    if price == 'market':
+        min_amount = round_up(pair_min / bid, precision)
+    else:
+        min_amount = round_up(pair_min / price, precision)
+
+    if amount < min_amount:
+        if auto_adjust:
+            amount = min_amount
+        else:
+            raise ccxt.InvalidOrder(f'Order does not meet minimum requirement of {pair_min} {pair}')
+
+    if amount * bid > get_balance(pair):
+        raise ccxt.InsufficientFunds('Insufficient funds to place this order')
+
+    if price == 'market':
+        return exchange.create_market_buy_order(symbol, amount)
+    else:
+        return exchange.create_limit_buy_order(symbol, amount, price)
 
 
 # Swaps a given percentage of one currency into another at market.
@@ -205,7 +149,7 @@ def swap(this, that, pair, percentage, *, auto_adjust=False):
     pair_amount = sell['info']['origQty'] * sell['info']['price']
     pair_percentage = pair_amount / get_balance(pair) * 100
     buy = buy(that, pair, pair_amount / get_balance(pair) * 100, auto_adjust=auto_adjust)
-    return [sell, buy]
+    return (sell, buy)
 
 
 # Swaps a given percentage of this for that. Sells this at the given percentage increase
@@ -213,15 +157,16 @@ def swap(this, that, pair, percentage, *, auto_adjust=False):
 def swap_limit(this, that, pair, percentage, this_increase, that_decrease, *, auto_adjust=False):
     sell_price = get_ticker(this)['bid'] * (100+that_increase/100)
     sell = sell(this, pair, percentage, sell_price, auto_adjust=auto_adjust)
+
     pair_amount = sell['info']['origQty'] * sell['info']['price']
     pair_percentage = pair_amount / get_balance(pair) * 100
+
     buy_price = get_ticker(that)['bid'] * (100-that_decrease)/100
     buy = buy(that, pair, pair_percantage, buy_price, auto_adjust=auto_adjust)
-    return [sell, buy]
+    return (sell, buy)
 
 
-# Cancels an order given the order dictionary.
-#
+# Cancels an order given the order dictionary returned by buy/sell.
 @retry_on_exception(2)
 def cancel_order(order):
     symbol = order['info']['symbol']
@@ -229,7 +174,6 @@ def cancel_order(order):
     match = symbol_regex.match(symbol)
     if match:
         exchange.cancel_order(order['id'], match[1] + f'/{match[2]}')
-        print(f'Cancelled order {order["id"]}: {order["amount"]} {symbol} at {order["price"]}')
         return True
     return False
 
@@ -284,47 +228,3 @@ def get_portfolio():
         portfolio[asset]['total'] = round(usd_balances[asset], 2)
         portfolio[asset]['percent'] = round(usd_balances[asset]/total*100, 2)
     return portfolio
-
-
-# ### DUSTING FUNCTIONS ###
-# # These should be temporary, as Binance is apparently in the works of adding
-# # this to their exchange.
-
-# # Converts a ticker to BNB.
-# def convert_to_bnb(ticker):
-#     if ticker + '/BNB' in exchange.symbols:
-#         return get_balance(ticker, 'total') * get_ticker(ticker, 'BNB')['last']
-
-
-# # Returns a dictionary with all tickers that contain non-fractional balances
-# with the non-fractional part
-# def find_dust():
-#     balances = exchange.get_balance()['total']
-#     balances.pop('ETH', None)
-#     balances.pop('BTC', None)
-#     balances.pop('USDT', None)
-#     balances.pop('BNB', None)
-#     # return all tickers with non-integer values
-#     return [ticker for ticker in balances if modf(balances[ticker])[0] > 0.01]
-
-
-# # Sells coins with a fractional value into BNB
-# def clean_dust():
-#     dust = find_dust()
-#     for ticker in dust:
-#         if ticker + '/BNB' in exchange.symbols:
-#             bnb_value = convert_to_bnb(ticker)
-#         else:
-#             continue
-#         if bnb_value > 1:
-#             sell(ticker, 100, 'BNB')
-#         else:
-#             ticker_needed = 1 - get_balance(ticker) + 0.01 # ROUNDING ERRORS :(
-#             try:
-#                 order = exchange.create_market_buy_order(ticker + '/BNB', ticker_needed)
-#             except ccxt.BaseError as e:
-#                 print(e)
-#                 continue
-#             print(order)
-#             sell(ticker, 100, 'BNB')
-

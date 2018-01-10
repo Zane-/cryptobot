@@ -2,19 +2,20 @@ import sys
 
 from exchange_utils import *
 
-def main(ticker, change_before, sell_percent, pair_percent, step_change, time_interval, pair):
+def main(ticker, pair, pair_total, change_before, sell_percent, step_change, time_interval):
     ticker_data = get_ticker(ticker, pair)
-    price = ticker_data['bid'] # use last bid to determine buy price
+    price = ticker_data['bid'] * 1.02 # use bid + 2% to try to buy in faster
     pair_start = get_balance(pair)
 
     buy_order = None
-    while buy_order is None:
-        buy_order = buy(ticker, pair, pair_percent, price, auto_adjust=True, max_auto_iterations=10)
+    while buy_order is None: # keep trying to buy, price fluctuations are massive during pumps
+        buy_order = buy(ticker, pair, pair_total, price, auto_adjust=True)
 
     print(f'[+] BUY ORDER PLACED: {buy_order["info"]["origQty"]} {ticker} AT {buy_order["info"]["price"]}')
 
     try: # do not proceed until buy order is filled
         while len(exchange.fetch_open_orders(ticker + f'/{pair}')) > 0:
+            sleep(0.5) # avoid spamming api with checks
             print('[-] ORDER NOT FILLED')
     except (EOFError, KeyboardInterrupt): # ctrl+c to cancel order and exit
         cancel_open_orders(ticker)
@@ -30,18 +31,18 @@ def main(ticker, change_before, sell_percent, pair_percent, step_change, time_in
             sell_price = price * (1 + sell_change/100)
             sell_order = None
             while sell_order is None:
-                sell_order = sell(ticker, pair, 100, sell_price, auto_adjust=True, max_auto_iteratios=10)
+                sell_order = sell(ticker, pair, fetch_balance(ticker), sell_price, auto_adjust=True)
             print(f'[+] SELLING {sell_order["info"]["origQty"]} {ticker} at {sell_order["info"]["price"]}')
             current_percent = get_ticker(ticker)['change']
             print(f'[+] CURRENT PERCENTAGE: {current_percent} | PERCENT TIL TARGET: {sell_change - current_percent}')
             print('[-] WAITING . . . PRESS CTRL+C TO SELL AT MARKET')
             sleep(time_interval)
-            cancel_order(sell_order)
+            cancel(sell_order)
             sell_change -= step_change
     except (KeyboardInterrupt, EOFError):
-        cancel_open_orders(ticker)
-        sell_order = sell(ticker, pair, 100, auto_adjust=True, max_auto_iterations=10)
-        print(':(')
+        cancel_orders(ticker)
+        sell_order = sell(ticker, pair, 100, auto_adjust=True)
+        print('[-] SOLD AT MARKET')
         sys.exit()
 
     print('[+] SOLD EVERYTHING . . .')
@@ -49,7 +50,7 @@ def main(ticker, change_before, sell_percent, pair_percent, step_change, time_in
 
 if __name__ == '__main__':
     print('[+] PRELOADING TICKER DATA . . .')
-    ticker_data = exchange.fetch_tickers()
+    ticker_data = get_all_tickers()
     print('[+] CANCELLING ALL ORDERS . . .')
     cancel_all_orders()
     sell_percent   = float(input('[+] ENTER PERCENTAGE INCREASE TO SELL: '))
@@ -62,22 +63,14 @@ if __name__ == '__main__':
     while pair_percent < min_percent:
         print(f'[-] DOES NOT SATISFY MINIMUM ORDER REQUIREMENTS: MINIMUM IS {min_percent}%')
         pair_percent = float(input(f'[+] RE-ENTER % OF {pair} YOU WOULD LIKE TO RISK: '))
-    sell_alts = input(f'[+] WOULD YOU LIKE TO SELL ALTCOINS INTO {pair}? (y|*): ').upper()
-
-    if sell_alts == 'Y':
-        alt_percent = float(input(f'[+] ENTER % OF ALTS TO SELL INTO {pair}: '))
-        pair_before = get_balance(pair)
-        pair_amount = pair_before * (pair_percent/100)
-        sells = sell_tickers(get_nonzero_balances(pairs=False), pair, alt_percent, auto_adjust=True, max_auto_iterations=10)
-        pair_after = get_balance(pair)
-        print(f'[+] SOLD ALTCOINS FOR A GAIN OF {pair_after-pair_before} {pair}')
-        pair_percent = (pair_amount + pair_after - pair_before) / pair_after * 100
 
     pair_total = get_balance(pair) * (pair_percent / 100)
-    pair_usd_total = get_ticker(pair, 'USDT')['last'] * pair_total
+    pair_usd_total = ticker_data[pair + f'/USDT']['last'] * pair_total
     print(f'[+] RISKING {pair_total} {pair} (${pair_usd_total})')
     ticker = input('[PUMP BOT READY] | ENTER TICKER TO START: ').upper()
+
     while f'{ticker}/{pair}' not in exchange.symbols: # validate ticker
         ticker = input(f'[-] TICKER {ticker} NOT FOUND, PLEASE RE-ENTER: ').upper()
     change_before = ticker_data[f'{ticker}/{pair}']['change']
-    main(ticker, change_before, sell_percent, pair_percent, step_change, time_interval, pair)
+
+    main(ticker, pair, pair_total, change_before, sell_percent, step_change, time_interval)

@@ -14,7 +14,4 @@ exchange = ccxt.binance({
 })
 
 exchange.load_markets()
-
-with open(f'{exchange.name.lower()}.json') as f:
-    exchange_config = json.load(f)
 #####~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#####

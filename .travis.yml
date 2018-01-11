@@ -1,13 +1,18 @@
 language: python
 python:
-  - "3.6"
-
+- '3.6'
 before_script:
-  - pip install -r requirements.txt
-
+- pip install -r requirements.txt
 script:
-  - python tests.py
-
+- python tests.py
 branches:
   only:
-    - master
+  - master
+deploy:
+  provider: heroku
+  api_key:
+    secure: "DN3i0xtakFdOVXoMe7uSW0B2AYX5/c0mpOmdiBmg4iA5+DfKc1ZkUZ+k+7fMrPy61PetLrR6fr8eC9oL3HPhWCMWvyCyurarHcAPcWp9SxEWdW23WKD0p/eihcB/PhEDXRiZthJzXOxf15GfT0GQiLme1pbTltzPl8ABggGB0Qy0tgt719V7RaR6X7X/rn74mmV/ItnTPwu7s/m86YiibpcDB0u0G8PTuFdZtI7NMQuKvgHeDOPzbDBmRl05OlOa3XuL95dNsLt0HaPtfvMiyKEuYnrS9aJZ31ik/iyMpNrggCwW89nFZhHgP50+d25vkSqYKtkfcmfDW65PFR65tqtzHRrjtkekjTx0eR2E0jmDQ0p3CNmyeplIsQoyiT1eL99mAfCzkw4LrMNiJwf8Sy+JnnGsMoOqQm3gzIjg2sfY1r7Qe9ht84vYTDlEC5LgCsGEOOqI6ytxiAZguyuQY4NU/PS4MvEodQFz97L0Rlzf6f/2snRmsKrSIwKf//QoP3ObpHLaeBhvYFEsHLo5lq5VkwRbFU+HsJ8WJCOsMti5TlC+HOJ+jKwgKLozffUAOR6CSGRoKCBzs5/z1D0PokxYuscQmRC7SITurersUWUiVoPE8dBn+5WwcK9osYi2xa/YPYSszGX5EIPCnU4fpRWTqVMEHrKz3d3vDdqLlLM="
+  app: uvacryptobot
+env:
+  global:
+    secure: i5BLmBqFH/JNIKvfQgELReQjif9SQJE9HFvWb3je+m6X9c4/hHuQyuxaq1JYPE9gALbyB09t8b3Lo1BNdGUqmhh1vUiZqP3jc0WJDqu2pj6EBJxYUe+YhMC7MyYGlXZ1ki8BY6Qv2CBQf6ImYi18NKTcv6PaXCS6cY8cnvNk8BNxr5kNbyZZjB3qON6wGtLYG/6Z5GeqrE6Wo7eiqRJwGQ7f4xTTpIXRmbz+Tg1Ta+kd4spZCtdHOQy0coxd3NJyH0KbLqA6YwY4Zgoy/1lvNo70K2fzt4/oGhqk2EW+RMmlNPkTbqwjSngkm8f4Zewo+lLnXaiX8FnxwIJwH78rFrFEiMtTkUvf+yLhY7LuHYqGGFhEZgrdeLUXaL/qDQY//QbpR5oeXmomiUunKmXphgaRy5i3gB/N1vmMJfsCXc3J57wXNHu3h6Q+okU/MOrXC4/OrX/dS2pjvtfRax7iqomRxby/JSgvTywUjbpDDSlBhd4DWKC1fWLaP4sgsJwF+UjR9NUJS/QScm9aEPUkFOL+pAclvh0ug4E+qnuepBV5MLOCKBeiDr+L8iEMrCFRSxzqYV9PtFdI4XCY5MD5RRrfMBAjGn0mkvNzveKaSCW0SCqFh10xWn+ig3pIpBArtQ/CE+81yNKfXMomO6pXXE/aB61rxb9ovtAmdTdo7Jc=

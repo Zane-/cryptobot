@@ -1,11 +1,11 @@
 # Cryptotrading Bot.
 
-__Note: Any pushes to this repo are immediately deployed to Heroku__
+__Note: Any pushes to the master branch of this repo are immediately deployed to Heroku__
 ## TODO:
-
-* Add dropbox support for download/updating/uploading the transactions.csv file. Heroku does not support writing to the local directory. Do this in log.py, then log orders in exchange_utils.
 * ~~Implement a scheduler within the script (add an infinite loop in the main method). Heroku's scheduler can only be run daily or hourly. Ideally we would like to fine tune the trade interval more.~~
-* Add a testfile (you can place test orders with the binance api).
+* ~~Add a testfile (you can place test orders with the binance api).~~
+* Implement strategies using technical analysis  
+
 ## Installing Requirements:
 `pip install -r requirements.txt`  
 ## Getting API Keys:

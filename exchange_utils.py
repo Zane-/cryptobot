@@ -52,6 +52,11 @@ def get_symbol(symbol):
     }
 
 
+# Returns a dictionary with the symbols passed in.
+def get_symbols(*symbols):
+    return {symbol: get_symbol(symbol) for symbol in symbols}
+
+
 # Returns a dictionary w/ data on all symbols on the exchange.
 def get_all_symbols():
     data = exchange.fetch_tickers()
@@ -83,7 +88,7 @@ def sell(symbol, percentage, price='market', *, auto_adjust=False):
     limits = exchange.markets[symbol]['limits']
     precision = exchange.markets[symbol]['precision']['amount']
 
-    price = get_symbol(symbol)['ask'] if price == 'market' else float(exchange.price_to_precision(symbol, price))
+    price = get_symbol(symbol)['bid'] if price == 'market' else float(exchange.price_to_precision(symbol, price))
     min_price = limits['price']['min']
     if price < min_price:
         if auto_adjust:

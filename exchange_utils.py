@@ -160,29 +160,18 @@ def sell(symbol, percentage, price='market', *, auto_adjust=False):
     ticker, pair = symbol.upper().split('/')
     limits = exchange.markets[symbol]['limits']
     precision = exchange.markets[symbol]['precision']['amount']
-
-    price = get_symbol(symbol)['bid'] if price == 'market' else float(exchange.price_to_precision(symbol, price))
-    min_price = limits['price']['min']
-    if price < min_price:
-        if auto_adjust:
-            price = min_price
-        else:
-            raise ccxt.InvalidOrder(f'Order price is below minimum of {min_price}')
-
-    ticker_balance = get_balance(ticker)
+    sell_price = get_symbol(symbol)['bid'] if price == 'market' else float(exchange.price_to_precision(symbol, price))
     # round down amount to avoid api auto rounding the wrong way, causing an insufficient funds exception
-    amount = round_down(ticker_balance * percentage/100, precision)
-    pair_min = limits['cost']['min']
+    amount = round_down(get_balance(ticker) * percentage/100, precision)
+    min_pair = limits['cost']['min']
     # round up amount to avoid api auto rounding the wrong way, causing an invalid order exception
-    min_amount = round_up(pair_min / price, precision)
+    min_amount = round_up(min_pair / sell_price, precision)
+
     if amount < min_amount:
         if auto_adjust:
             amount = min_amount
         else:
-            raise ccxt.InvalidOrder(f'Order does not meet minimum requirement of {pair_min} {pair}')
-
-    if amount > ticker_balance:
-        raise ccxt.InsufficientFunds('Insufficient funds to place this order')
+            raise ccxt.InvalidOrder(f'Order does not meet minimum requirement of {min_pair} {pair}')
 
     if price == 'market':
         return exchange.create_market_sell_order(symbol, amount)
@@ -232,35 +221,25 @@ def buy(symbol, percentage, price='market', *, auto_adjust=False):
     ticker, pair = symbol.upper().split('/')
     limits = exchange.markets[symbol]['limits']
     precision = exchange.markets[symbol]['precision']['amount']
+    pair_amount = get_balance(pair) * percentage/100
 
-    price = get_symbol(symbol)['ask'] if price == 'market' else float(exchange.price_to_precision(symbol, price))
-    min_price = limits['price']['min']
-    if price < min_price:
-        if auto_adjust:
-            price = min_price
-        else:
-            raise ccxt.InvalidOrder(f'Order price is below minimum of {min_price}')
-
-    pair_balance = get_balance(pair)
-    pair_amount = pair_balance * percentage/100
+    buy_price = get_symbol(symbol)['ask'] if price == 'market' else float(exchange.price_to_precision(symbol, price))
     # round down amount to avoid api auto rounding the wrong way, causing an insufficient funds exception
-    amount = round_down(pair_amount / price, precision)
-    pair_min = limits['cost']['min']
+    amount = round_down(pair_amount / buy_price, precision)
     # round up amount to avoid api auto rounding the wrong way, causing an invalid order exception
-    min_amount = round_up(pair_min / price, precision)
+    min_pair = limits['cost']['min']
+    min_amount = round_up(min_pair/ buy_price, precision)
+
     if amount < min_amount:
         if auto_adjust:
             amount = min_amount
         else:
-            raise ccxt.InvalidOrder(f'Order does not meet minimum requirement of {pair_min} {pair}')
-
-    if amount * price > pair_balance:
-        raise ccxt.InsufficientFunds(f'Insufficient funds to place this order.')
+            raise ccxt.InvalidOrder(f'Order does not meet minimum requirement of {min_pair} {pair}')
 
     if price == 'market':
         return exchange.create_market_buy_order(symbol, amount)
     else:
-        return exchange.create_limit_buy_order(symbol, amount, price)
+        return exchange.create_limit_buy_order(symbol, amount, buy_price)
 
 
 # Swaps a given percentage this into that at market.

@@ -29,7 +29,7 @@ class LowHighPairBot:
     def get_lowest_highest(self, data):
         """Returns a tuple containing the highest and lowest 24 hr changes in the data."""
         low, high = 0, 0
-        for symbol in data.keys():
+        for symbol in data:
             change = data[symbol]['change']
             if change > high:
                 high, highest = change, symbol
@@ -100,9 +100,9 @@ class BinanceNewListingBot:
             symbol = f'{list(difference)[0]}/{self.pair}'
             buy(symbol, self.percentage, auto_adjust=True)
             print(f'New currency detected: bought {symbol} with {self.percentage} of {self.pair}')
-            price = get_symbol(symbol)['ask']
             if self.sell_after:
-                sell(symbol, 100, price*self.sell_multiplier, auto_adjust=True)
+                price = get_symbol(symbol)['ask'] * self.sell_multiplier
+                sell(symbol, 100, price, auto_adjust=True)
             return True
 
     def start(self):
@@ -145,21 +145,21 @@ class PoolProfitBot:
 
     def check_for_profits(self):
         """Checks if the USD value any of the tickers in feeders is greater
-        than the initial value + the profit threshold. If any are, a dictionary
+        than the the sell point. If any are, a dictionary
         mapping the ticker to the percentage of the total balance that is profit
         is returned.
         """
         profits = {}
-        for ticker in self.feeders.keys():
+        for ticker in self.feeders:
             usd = get_usd_balance(ticker)
-            intial = feeders[ticker][initial]
-            sell_point = feeders[ticker][sell_point]
+            intial = self.feeders[ticker][initial]
+            sell_point = self.feeders[ticker][sell_point]
 
             if usd >= sell_point:
                 # proportion of profit to total usd value
-                profit_percent = (usd - initial) / usd
+                profit_percent = ((usd - initial) / usd) * 100
                 profits[ticker] = profit_percent
-        return profits if len(profits.keys()) > 0 else None
+        return profits if len(profits) > 0 else None
 
     def run(self):
         """Checks for profit and swaps it into the pool."""

@@ -1,4 +1,5 @@
 import re
+from functools import wraps
 from math import floor, ceil
 from time import sleep
 
@@ -16,11 +17,12 @@ def network_error_retry(interval, retries=5):
         retries: The number of times to retry. Defaults to 5.
     """
     def decorator(func):
+        @wraps(func)
         def wrapper(*args, **kwargs):
             for _ in range(retries):
                 try:
                     return func(*args, **kwargs)
-                except ccxt.NetworkError as e:
+                except ccxt.NetworkError:
                     print(f'A network error occured. Retrying in {interval} seconds.')
                     sleep(interval)
             return None
@@ -35,25 +37,24 @@ def get_balance(ticker, account='free'):
     Args:
         ticker: The ticker to get the balance for.
         account: The account to get the balance for. Can either be
-            'free', returning the balance not in open trades,
-            or 'total', returning the balance including open trades.
+            'free', returning the balance not in open trades, etc.,
+            or 'total', returning the balance including open trades, etc.
             Defaults to 'free'.
 
     Returns:
         A float of the balance of the ticker in the specified account.
     """
-    return float(exchange.fetch_balance()[ticker][account])
+    return exchange.fetch_balance()[ticker][account]
 
 
-# Returns a list of tickers with non-zero balances in the account.
 @network_error_retry(2)
 def get_nonzero_balances(account='total'):
     """Gets the nonzero balances in the account.
 
     Args:
         account: The account to get the balance for. Can either be
-            'free', returning the balance not in open trades,
-            or 'total', returning the balance including open trades.
+            'free', returning the balance not in open trades, etc.,
+            or 'total', returning the balance including open trades, etc.
             Defaults to 'total'.
 
     Returns:
@@ -61,7 +62,7 @@ def get_nonzero_balances(account='total'):
         specified account.
     """
     balances = exchange.fetch_balance()[account]
-    return {asset: balances[asset] for asset in balances.keys() if balances[asset] > 0}
+    return {ticker: balances[ticker] for ticker in balances if balances[ticker] > 0}
 
 
 @network_error_retry(2)
@@ -75,42 +76,21 @@ def get_symbol(symbol):
         A dictionary mapping each attribute to current market data.
         Includes bid, ask, last, open, close, high, low, change, and volume.
     """
-    data = exchange.fetch_ticker(symbol)
-    return {
-        'bid':    data['bid'],
-        'ask':    data['ask'],
-        'last':   data['last'],
-        'open':   data['open'],
-        'close':  data['close'],
-        'high':   data['high'],
-        'low':    data['low'],
-        'change': data['change'],
-        'volume': data['quoteVolume']
-    }
+    return exchange.fetch_ticker(symbol)
 
 
-# Returns a dictionary with the symbols passed in.
 def get_symbols(*symbols):
     """Returns a dictionary mapping each symbol passed in to its market data."""
     return {symbol: get_symbol(symbol) for symbol in symbols}
 
 
+@network_error_retry(2)
 def get_all_symbols():
     """Returns a dictionary mapping all symbols in the exchange to their market data."""
     data = exchange.fetch_tickers() # returns data for all symbols
     symbols = {}
     for symbol in data:
-        symbols[symbol] = {
-            'bid':    data[symbol]['bid'],
-            'ask':    data[symbol]['ask'],
-            'last':   data[symbol]['last'],
-            'open':   data[symbol]['open'],
-            'close':  data[symbol]['close'],
-            'high':   data[symbol]['high'],
-            'low':    data[symbol]['low'],
-            'change': data[symbol]['change'],
-            'volume': data[symbol]['quoteVolume']
-        }
+        symbols[symbol] = {key: data[symbol][key] for key in data[symbol]}
     return symbols
 
 
@@ -120,7 +100,7 @@ round_down = lambda n, p: round(floor(n/10**-p)*10**-p, p)
 round_up = lambda n, p: round(ceil(n/10**-p)*10**-p, p)
 
 
-@network_error_retry(2)
+@network_error_retry(1)
 def sell(symbol, percentage, price='market', *, auto_adjust=False):
     """Places a sell order.
 
@@ -160,9 +140,11 @@ def sell(symbol, percentage, price='market', *, auto_adjust=False):
     ticker, pair = symbol.upper().split('/')
     limits = exchange.markets[symbol]['limits']
     precision = exchange.markets[symbol]['precision']['amount']
+
     sell_price = get_symbol(symbol)['bid'] if price == 'market' else float(exchange.price_to_precision(symbol, price))
+    ticker_balance = get_balance(ticker)
     # round down amount to avoid api auto rounding the wrong way, causing an insufficient funds exception
-    amount = round_down(get_balance(ticker) * percentage/100, precision)
+    amount = round_down(ticker_balance * percentage/100, precision)
     min_pair = limits['cost']['min']
     # round up amount to avoid api auto rounding the wrong way, causing an invalid order exception
     min_amount = round_up(min_pair / sell_price, precision)
@@ -172,6 +154,8 @@ def sell(symbol, percentage, price='market', *, auto_adjust=False):
             amount = min_amount
         else:
             raise ccxt.InvalidOrder(f'Order does not meet minimum requirement of {min_pair} {pair}')
+    if amount > ticker_balance:
+        raise ccxt.InsufficientFunds(f'Account does not have {amount} {ticker}. Balance: {ticker_balance}')
 
     if price == 'market':
         return exchange.create_market_sell_order(symbol, amount)
@@ -179,7 +163,7 @@ def sell(symbol, percentage, price='market', *, auto_adjust=False):
         return exchange.create_limit_sell_order(symbol, amount, price)
 
 
-@network_error_retry(2)
+@network_error_retry(1)
 def buy(symbol, percentage, price='market', *, auto_adjust=False):
     """Places a buy order.
 
@@ -221,29 +205,29 @@ def buy(symbol, percentage, price='market', *, auto_adjust=False):
     ticker, pair = symbol.upper().split('/')
     limits = exchange.markets[symbol]['limits']
     precision = exchange.markets[symbol]['precision']['amount']
-    pair_amount = get_balance(pair) * percentage/100
 
     buy_price = get_symbol(symbol)['ask'] if price == 'market' else float(exchange.price_to_precision(symbol, price))
+    pair_balance = get_balance(pair)
+    pair_amount = pair_balance * percentage/100
     # round down amount to avoid api auto rounding the wrong way, causing an insufficient funds exception
     amount = round_down(pair_amount / buy_price, precision)
     # round up amount to avoid api auto rounding the wrong way, causing an invalid order exception
     min_pair = limits['cost']['min']
-    min_amount = round_up(min_pair/ buy_price, precision)
+    min_amount = round_up(min_pair / buy_price, precision)
 
     if amount < min_amount:
         if auto_adjust:
             amount = min_amount
         else:
             raise ccxt.InvalidOrder(f'Order does not meet minimum requirement of {min_pair} {pair}')
-
+    if amount * buy_price > pair_balance:
+        raise ccxt.InsufficientFunds(f'Account does not have {amount} {ticker}. Balance: {ticker_balance}')
     if price == 'market':
         return exchange.create_market_buy_order(symbol, amount)
     else:
         return exchange.create_limit_buy_order(symbol, amount, buy_price)
 
 
-# Swaps a given percentage this into that at market.
-# this and that must share the same pair.
 def swap(this, that, percentage, *, auto_adjust=False):
     """Swaps two symbols at market price.
 
@@ -253,22 +237,48 @@ def swap(this, that, percentage, *, auto_adjust=False):
         percentage: The percentage of 'this' to sell.
         auto_adjust: Whether or not to automatically set the percentage
             to the minimum if it is not met through the original parameters
-            passed in. Defaults to False. Must be pased in as a keyword arg.
+            passed in. Defaults to False. Must be passed in as a keyword arg.
 
     Returns:
         A tuple containing the JSON responses of the sell and buy orders respectively.
     """
+    sell_price = get_symbol(this)['ask']  # get ask because market orders don't return price
     sell_order = sell(this, percentage, auto_adjust=auto_adjust)
 
-    pair_amount = sell_order['info']['origQty'] * sell['info']['price']
+    pair_amount = sell_order['info']['origQty'] * sell_price
     pair_percentage = pair_amount / get_balance(pair) * 100
 
-    buy_order = buy(that, percentage, auto_adjust=auto_adjust)
+    buy_order = buy(that, pair_percentage, auto_adjust=auto_adjust)
     return (sell_order, buy_order)
 
 
-# Returns all open orders for the ticker passed in. Returns a dictionary divided
-# into lists for buy and sell orders.
+def limit_swap(this, that, percentage, this_price, that_price, *, wait_til_filled=True, auto_adjust=False):
+    """Swaps two symbols at a given price for both.
+
+    Args:
+        this: The symbol to sell.
+        that: The symbol to buy.
+        percentage: The percentage of 'this' to sell.
+        wail_til_filled: Whether or not to wait until the sell order has been
+            completely filled before placing the buy order.
+            Defaults to True. Must be passed in as a keyword arg.
+        auto_adjust: Whether or not to automatically set the percentage
+            to the minimum if it is not met through the original parameters
+            passed in. Defaults to False. Must be passed in as a keyword arg.
+    """
+    sell_order = sell(this, percentage, this_price, auto_adjust=auto_adjust)
+
+    if wait_til_filled:
+        while exchange.fetch_order(sell_order['id'], this)['status'] != 'filled':
+            sleep(3)  # check for order fill every 3 seconds to avoid spamming api
+
+    pair_amount = sell_order['info']['origQty'] * sell_order['info']['price']
+    pair_percentage = pair_amount / get_balance(pair) * 100
+
+    buy_order = buy(that, pair_percentage, auto_adjust=auto_adjust)
+    return (sell_order, buy_order)
+
+
 @network_error_retry(2)
 def get_open_orders(ticker):
     """Returns open orders for the ticker.
@@ -288,9 +298,8 @@ def get_open_orders(ticker):
     orders = {'buy': [], 'sell': []}
     symbols = [symbol for symbol in exchange.symbols if symbol.startswith(ticker)]
     for symbol in symbols:
-        if symbol in exchange.symbols:
-            for order in exchange.fetch_open_orders(symbol):
-                orders[order['side']].append(order)
+        for order in exchange.fetch_open_orders(symbol):
+            orders[order['side']].append(order)
     return orders
 
 
@@ -356,7 +365,7 @@ def cancel_all_orders(*tickers, side='both'):
         side: The side to cancel orders for. Can either be 'sell',
             'buy', or 'both'. Defaults to both.
     """
-    tickers = tickers if len(tickers) > 0 else get_nonzero_balances().keys()
+    tickers = tickers if len(tickers) > 0 else get_nonzero_balances()
     for ticker in tickers:
         cancel_orders(ticker, side)
 
@@ -378,10 +387,10 @@ def get_usd_balance(ticker):
 def get_portfolio():
     """Returns the total value of funds in all accounts in USD."""
     balances = get_nonzero_balances()
-    usd_balances = {ticker: get_usd_balance(ticker) for ticker in balances.keys()}
+    usd_balances = {ticker: get_usd_balance(ticker) for ticker in balances}
     total = sum(usd_balances.values())
     portfolio = {'total': total}
-    for ticker in usd_balances.keys():
+    for ticker in usd_balances:
         portfolio[ticker] = {}
         portfolio[ticker]['total'] = round(usd_balances[ticker], 2)
         portfolio[ticker]['percent'] = round(usd_balances[ticker]/total*100, 2)

@@ -1,11 +1,11 @@
 from strategies import BinanceNewListingBot
 
 def main():
-    INTERVAL = 3 # check every 3 seconds
+    INTERVAL = 10 # check every 3 seconds
     PAIR = 'ETH' # pair to buy/sell with
     PERCENTAGE = 100 # percentage of pair to buy with
     SELL_AFTER = True # whether or not to place a sell order directly after
-    SELL_MULTIPLIER = 2
+    SELL_MULTIPLIER = 2 # number to multiply the price by
     bot = BinanceNewListingBot(INTERVAL, PAIR, PERCENTAGE, SELL_AFTER, SELL_MULTIPLIER)
     bot.start()
 

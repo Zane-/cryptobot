@@ -15,7 +15,7 @@ class ExchangeUtilsTest(unittest.TestCase):
         self.assertIsInstance(nonzero_balances, dict)
 
     def test_get_symbol(self):
-        vol_btc = get_symbol('ETH/BTC')['volume']
+        vol_btc = get_symbol('ETH/BTC')['quoteVolume']
         self.assertTrue(vol_btc > 0)
 
     def test_get_symbols(self):

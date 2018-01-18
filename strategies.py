@@ -113,6 +113,7 @@ class BinanceNewListingBot:
                 break
             sleep(self.interval)
             print(f'Attempt #{count}')
+            count += 1
 
 
 

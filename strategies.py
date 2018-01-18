@@ -107,10 +107,12 @@ class BinanceNewListingBot:
 
     def start(self):
         """Runs self.run() every self.interval seconds. Exits if a new currency is detected."""
+        count = 1
         while True:
             if self.run(): # returns True if bought something
                 break
             sleep(self.interval)
+            print(f'Attempt #{count}')
 
 
 
@@ -146,7 +148,7 @@ class PoolProfitBot:
     def check_for_profits(self):
         """Checks if the USD value any of the tickers in feeders is greater
         than the the sell point. If any are, a dictionary
-        mapping the ticker to the percentage of the total balance that is profit
+        mapping the ticker to the percentage of the total balance thattttnnt is profit
         is returned.
         """
         profits = {}

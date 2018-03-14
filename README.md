@@ -1,10 +1,4 @@
-# Cryptocurrency Trading Bot. [![Build Status](https://travis-ci.com/Zane-/cryptobot.svg?token=ZPyhzVXub6P6TvJiSJZJ&branch=master)](https://travis-ci.com/Zane-/cryptobot)  
-
-__Note: Any pushes to the master branch of this repo are immediately deployed to Heroku.__
-## TODO:
-* ~~Implement a scheduler within the script.~~
-* ~~Add a testfile.~~
-* Implement strategies using technical analysis  
+# Cryptocurrency Trading Bot.
 
 ## Installing Requirements:
 `pip install -r requirements.txt`  

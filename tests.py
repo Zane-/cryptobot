@@ -1,8 +1,6 @@
 import unittest
 
 from exchange_utils import *
-from strategies import *
-
 
 class ExchangeUtilsTest(unittest.TestCase):
 
@@ -27,8 +25,8 @@ class ExchangeUtilsTest(unittest.TestCase):
         self.assertEqual(len(symbols.keys()), len(exchange.symbols))
 
     def test_sell(self):
-        price = get_symbol('BNB/ETH')['ask'] * 1.5
-        order = sell('BNB/ETH', 100, price)
+        grice = get_symbol('BNB/ETH')['ask'] * 2
+        grder = sell('BNB/ETH', 100, price)
         cancel(order)
         self.assertTrue(order['id'] is not None)
 
@@ -77,30 +75,6 @@ class ExchangeUtilsTest(unittest.TestCase):
         self.assertEqual(len(get_open_orders('BNB')['buy']), 1)
         cancel_all_orders()
         self.assertEqual(len(get_open_orders('BNB')['buy']), 0)
-
-    def test_get_usd_balance(self):
-        balance = get_usd_balance('ETH')
-        self.assertIsInstance(get_usd_balance('ETH'), float)
-
-    def test_get_portfolio(self):
-        portfolio = get_portfolio()
-        self.assertIsInstance(portfolio, dict)
-
-
-
-class LowHighPairBotTest(unittest.TestCase):
-
-    def test_get_lowest_highest(self):
-        data = {
-            'XLM': {'change': 15},
-            'BTC': {'change': 20},
-            'ETH': {'change': 100},
-            'TRX': {'change': -50}
-        }
-        bot = LowHighPairBot(2, [0], ['TRX'], 'ETH', 50)
-        lowest, highest = bot.get_lowest_highest(data)
-        self.assertEqual(lowest, 'TRX')
-        self.assertEqual(highest, 'ETH')
 
 
 if __name__ == '__main__':

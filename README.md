@@ -23,3 +23,6 @@ exchange = ccxt.bittrex({
     'secret': keys['bittrex']['api_secret'],
 })
 ```
+
+## Examples
+Example bots are in the bots subfolder. I am not liable for anything that happens if you choose to use these bots.

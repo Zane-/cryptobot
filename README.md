@@ -14,3 +14,12 @@
         }
     }
     ```
+## Changing Exchanges
+* In auth.py, change  ccxt.binance to ccxt.exchange_of_your_choice, see [ccxt](https://github.com/ccxt/ccxt) documentation for a list of supported exchanges. I've tried to make sure all the functions in exchange_utils work across any exchange, but they have only been thouroughly tested on Binance.  
+Example:
+```python
+exchange = ccxt.bittrex({
+    'apiKey': keys['bittrex']['api_key'],
+    'secret': keys['bittrex']['api_secret'],
+})
+```

@@ -1,8 +1,11 @@
-# Cryptocurrency Trading Bot.
+# Cryptocurrency Bot
 
-## Installing Requirements:
+## Usage
+* Clone the repo and use exchange_utils.py and auth.py as normal modules.
+* API keys are required for each exchange you use.
+### Installing Requirements:
 `pip install -r requirements.txt`  
-## Getting API Keys:
+### Getting API Keys:
 * Generate keys for binance: https://www.binance.com/userCenter/createApi.html  
 * Add the keys to a file named `api_keys.json` in the same directory
     ### Format of api_keys.json:
@@ -14,7 +17,7 @@
         }
     }
     ```
-## Changing Exchanges
+### Changing Exchanges
 * In auth.py, change  ccxt.binance to ccxt.exchange_of_your_choice, see [ccxt](https://github.com/ccxt/ccxt) documentation for a list of supported exchanges. I've tried to make sure all the functions in exchange_utils work across any exchange, but they have only been thouroughly tested on Binance.  
 Example:
 ```python

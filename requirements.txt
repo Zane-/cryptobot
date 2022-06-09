@@ -8,6 +8,6 @@ chardet==3.0.4
 idna==2.6
 multidict==3.3.2
 pycares==2.3.0
-requests==2.18.4
+requests==2.20.0
 urllib3==1.26.5
 yarl==0.17.0

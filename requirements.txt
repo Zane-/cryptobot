@@ -3,7 +3,7 @@ aiohttp==3.7.4
 async-timeout==2.0.0
 cchardet==2.1.1
 ccxt==1.10.561
-certifi==2017.11.5
+certifi==2022.12.7
 chardet==3.0.4
 idna==2.6
 multidict==3.3.2
